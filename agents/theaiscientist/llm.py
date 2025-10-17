@@ -13,11 +13,6 @@ from google.generativeai.types import GenerationConfig
 
 MAX_NUM_TOKENS = 4096
 
-AVAILABLE_PROVIDERS = [
-    "OpenRouter",
-    "OpenAI",
-]
-
 AVAILABLE_LLMS = [
     # Anthropic models
     "claude-3-5-sonnet-20240620",
@@ -406,51 +401,12 @@ def extract_json_between_markers(llm_output):
                 continue  # Try next match
     return None  # No valid JSON found
 
-
-# Original version. It can not specify the provider
-# def create_client(model):
-#     if model.startswith("claude-"):
-#         print(f"Using Anthropic API with model {model}.")
-#         return anthropic.Anthropic(), model
-#     elif model.startswith("bedrock") and "claude" in model:
-#         client_model = model.split("/")[-1]
-#         print(f"Using Amazon Bedrock with model {client_model}.")
-#         return anthropic.AnthropicBedrock(), client_model
-#     elif model.startswith("vertex_ai") and "claude" in model:
-#         client_model = model.split("/")[-1]
-#         print(f"Using Vertex AI with model {client_model}.")
-#         return anthropic.AnthropicVertex(), client_model
-#     elif 'gpt' in model or "o1" in model or "o3" in model:
-#         print(f"Using OpenAI API with model {model}.")
-#         return openai.OpenAI(), model
-#     elif model in ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]:
-#         print(f"Using OpenAI API with {model}.")
-#         return openai.OpenAI(
-#             api_key=os.environ["DEEPSEEK_API_KEY"],
-#             base_url="https://api.deepseek.com"
-#         ), model
-#     elif model == "llama3.1-405b":
-#         print(f"Using OpenAI API with {model}.")
-#         return openai.OpenAI(
-#             api_key=os.environ["OPENROUTER_API_KEY"],
-#             base_url="https://openrouter.ai/api/v1"
-#         ), "meta-llama/llama-3.1-405b-instruct"
-#     elif "gemini" in model:
-#         print(f"Using OpenAI API with {model}.")
-#         return openai.OpenAI(
-#             api_key=os.environ["GEMINI_API_KEY"],
-#             base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-#         ), model
-#     else:
-#         raise ValueError(f"Model {model} not supported.")
-    
-
 def create_client(model, provider='OpenAI'):
 
     # Check whether the provider is in the valid list
-    provider_list = ['OpenRouter', 'Anthropic', 'AnthropicBedrock', 'AnthropicVertex', 'OpenAI', 'DeepSeek', 'Google']
+    provider_list = ['OpenRouter', 'OpenAI', 'Google']
     if provider not in provider_list:
-        raise ValueError(f"Provided {provider} not supported. Supported provides: 'OpenRouter', 'Anthropic', 'AnthropicBedrock', 'AnthropicVertex', 'OpenAI', 'DeepSeek', 'Google'")
+        raise ValueError(f"Provided {provider} not supported. Supported provides: 'OpenRouter', 'OpenAI', 'Google'")
 
 
     if provider == 'OpenRouter':
@@ -473,39 +429,3 @@ def create_client(model, provider='OpenAI'):
     
     else:
         raise NotImplementedError(f"Provider {provider} not implemented.")
-
-    
-    if model.startswith("claude-"):
-        print(f"Using Anthropic API with model {model}.")
-        return anthropic.Anthropic(), model
-    elif model.startswith("bedrock") and "claude" in model:
-        client_model = model.split("/")[-1]
-        print(f"Using Amazon Bedrock with model {client_model}.")
-        return anthropic.AnthropicBedrock(), client_model
-    elif model.startswith("vertex_ai") and "claude" in model:
-        client_model = model.split("/")[-1]
-        print(f"Using Vertex AI with model {client_model}.")
-        return anthropic.AnthropicVertex(), client_model
-    elif 'gpt' in model or "o1" in model or "o3" in model:
-        print(f"Using OpenAI API with model {model}.")
-        return openai.OpenAI(), model
-    elif model in ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]:
-        print(f"Using OpenAI API with {model}.")
-        return openai.OpenAI(
-            api_key=os.environ["DEEPSEEK_API_KEY"],
-            base_url="https://api.deepseek.com"
-        ), model
-    elif model == "llama3.1-405b":
-        print(f"Using OpenAI API with {model}.")
-        return openai.OpenAI(
-            api_key=os.environ["OPENROUTER_API_KEY"],
-            base_url="https://openrouter.ai/api/v1"
-        ), "meta-llama/llama-3.1-405b-instruct"
-    elif "gemini" in model:
-        print(f"Using OpenAI API with {model}.")
-        return openai.OpenAI(
-            api_key=os.environ["GEMINI_API_KEY"],
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-        ), model
-    else:
-        raise ValueError(f"Model {model} not supported.")
