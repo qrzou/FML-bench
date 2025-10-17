@@ -1,0 +1,49 @@
+{
+    "repo_dir": "workspace/Privacy_privacymeter/ml_privacy_meter",
+    "target_files": [
+        "trainers/default_trainer.py",
+        "models/wide_resnet.py"
+    ],
+    "related_files": [
+
+    ],
+    "read_only_files": [
+        "models/utils.py",
+        "audit.py",
+        "util.py",
+        "get_signals.py",
+        "run_mia.py",
+        "configs/cifar10_benchmark.yaml"
+    ],
+    "starter_file": "",
+    "backup_excluded_files": [
+        ".aider.tags.cache.v4/",
+        "results_tmp/"
+    ],
+    "conda_env": "privacy_meter",
+    "prepare_setup_files": true,
+    "setup_commands": [
+        "cp ../../../ml_tasks/Privacy_privacymeter/cifar10_benchmark.yaml ./configs/"
+    ],
+    "do_preprocess": true,
+    "preprocess_note": "We need to copy the run_mia.py and some other related files to the workspace before running the experiment, because the coder has chance to write to the files",
+    "preprocess_commands": [
+        "cp ../../../ml_tasks/Privacy_privacymeter/original_file_backup/models/utils.py ./models/",
+        "cp ../../../ml_tasks/Privacy_privacymeter/original_file_backup/audit.py ./",
+        "cp ../../../ml_tasks/Privacy_privacymeter/original_file_backup/util.py ./",
+        "cp ../../../ml_tasks/Privacy_privacymeter/original_file_backup/get_signals.py ./",
+        "cp ../../../ml_tasks/Privacy_privacymeter/original_file_backup/run_mia.py ./",
+        "cp ../../../ml_tasks/Privacy_privacymeter/cifar10_benchmark.yaml ./configs/"
+    ],
+    "execute_commands": [
+        "python run_mia.py --cf configs/cifar10_benchmark.yaml"
+    ],
+    "exp_running_dir": "results_tmp/",
+    "do_postprocess": true,
+    "postprocess_commands": [
+        "cp ../../../ml_tasks/Privacy_privacymeter/postprocess.py ./",
+        "python postprocess.py --exp_dir results_tmp",
+        "rm postprocess.py"
+    ],
+    "note": "The final_info.json we got from postprocess should be UNDER the exp_running_dir"
+}

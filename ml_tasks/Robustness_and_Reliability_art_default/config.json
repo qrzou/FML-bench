@@ -1,0 +1,51 @@
+{
+    "repo_dir": "workspace/Robustness_and_Reliability_art_default/adversarial-robustness-toolbox",
+    "target_files": [
+        "art/defences/trainer/dp_instahide_trainer.py",
+        "model.py"
+    ],
+    "related_files": [
+
+    ],
+    "read_only_files": [
+        "art/attacks/poisoning/backdoor_attack.py",
+        "art/attacks/poisoning/perturbations/image_perturbations.py",
+        "art/estimators/classification/keras.py",
+        "art/utils.py",
+        "art/defences/preprocessor/mixup/mixup.py",
+        "trainer.py",
+        "eval.py"
+    ],
+    "starter_file": "",
+    "backup_excluded_files": [
+        ".aider.tags.cache.v4/",
+        "results_tmp/"
+    ],
+    "conda_env": "art",
+    "prepare_setup_files": true,
+    "setup_commands": [
+        "cp ../../../ml_tasks/Robustness_and_Reliability_art_default/eval.py ./",
+        "cp ../../../ml_tasks/Robustness_and_Reliability_art_default/model.py ./",
+        "cp ../../../ml_tasks/Robustness_and_Reliability_art_default/trainer.py ./"
+    ],
+    "do_preprocess": true,
+    "preprocess_note": "We need to copy the eval.py and some other related files to the workspace before running the experiment, because the coder has chance to write to the files",
+    "preprocess_commands": [
+        "cp ../../../ml_tasks/Robustness_and_Reliability_art_default/original_file_backup/backdoor_attack.py ./art/attacks/poisoning/",
+        "cp ../../../ml_tasks/Robustness_and_Reliability_art_default/original_file_backup/image_perturbations.py ./art/attacks/poisoning/perturbations/",
+        "cp ../../../ml_tasks/Robustness_and_Reliability_art_default/original_file_backup/keras.py ./art/estimators/classification/",
+        "cp ../../../ml_tasks/Robustness_and_Reliability_art_default/original_file_backup/utils.py ./art/",
+        "cp ../../../ml_tasks/Robustness_and_Reliability_art_default/original_file_backup/mixup.py ./art/defences/preprocessor/mixup/",
+        "cp ../../../ml_tasks/Robustness_and_Reliability_art_default/trainer.py ./",
+        "cp ../../../ml_tasks/Robustness_and_Reliability_art_default/eval.py ./"
+    ],
+    "execute_commands": [
+        "python eval.py"
+    ],
+    "exp_running_dir": "results_tmp/",
+    "do_postprocess": false,
+    "postprocess_commands": [
+
+    ],
+    "note": "The final_info.json we got from postprocess should be UNDER the exp_running_dir"
+}

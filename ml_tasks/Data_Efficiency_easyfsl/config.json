@@ -1,0 +1,39 @@
+{
+    "repo_dir": "workspace/Data_Efficiency_easyfsl/easy-few-shot-learning",
+    "target_files": [
+        "easyfsl/methods/few_shot_classifier.py",
+        "easyfsl/methods/prototypical_networks.py"
+    ],
+    "related_files": [
+
+    ],
+    "read_only_files": [
+        "eval.py", 
+        "scripts/benchmark_methods.py"
+    ],
+    "starter_file": "",
+    "backup_excluded_files": [
+        ".aider.tags.cache.v4/",
+        "results_tmp/"
+    ],
+    "conda_env": "easyfsl",
+    "prepare_setup_files": true,
+    "setup_commands": [
+        "cp ../../../ml_tasks/Data_Efficiency_easyfsl/eval.py ./"
+    ],
+    "do_preprocess": true,
+    "preprocess_note": "We need to copy the eval.py and benchmark_methods.py to the workspace before running the experiment, because the coder has chance to write to the files",
+    "preprocess_commands": [
+        "cp ../../../ml_tasks/Data_Efficiency_easyfsl/eval.py ./",
+        "cp ../../../ml_tasks/Data_Efficiency_easyfsl/original_file_backup/benchmark_methods.py ./scripts/"
+    ],
+    "execute_commands": [
+        "python eval.py"
+    ],
+    "exp_running_dir": "results_tmp/",
+    "do_postprocess": false,
+    "postprocess_commands": [
+
+    ],
+    "note": "The final_info.json we got from postprocess should be UNDER the exp_running_dir"
+}

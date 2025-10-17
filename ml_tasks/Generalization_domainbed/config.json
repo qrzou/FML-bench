@@ -1,0 +1,48 @@
+{
+    "repo_dir": "workspace/Generalization_domainbed/DomainBed",
+    "target_files": [
+        "domainbed/algorithms.py",
+        "domainbed/networks.py"
+    ],
+    "related_files": [
+
+    ],
+    "read_only_files": [
+        "domainbed/scripts/train.py",
+        "domainbed/datasets.py",
+        "domainbed/hparams_registry.py",
+        "domainbed/model_selection.py",
+        "domainbed/lib/misc.py",
+        "domainbed/lib/fast_data_loader.py"
+    ],
+    "starter_file": "",
+    "backup_excluded_files": [
+        ".aider.tags.cache.v4/",
+        "results_tmp/"
+    ],
+    "conda_env": "domainbed",
+    "prepare_setup_files": false,
+    "setup_commands": [
+    ],
+    "do_preprocess": true,
+    "preprocess_note": "We need to copy the train.py and some other related files to the workspace before running the experiment, because the coder has chance to write to the files",
+    "preprocess_commands": [
+        "cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/train.py ./domainbed/scripts/",
+        "cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/datasets.py ./domainbed/",
+        "cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/hparams_registry.py ./domainbed/",
+        "cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/model_selection.py ./domainbed/",
+        "cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/misc.py ./domainbed/lib/",
+        "cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/fast_data_loader.py ./domainbed/lib/"
+    ],
+    "execute_commands": [
+        "python -m domainbed.scripts.train --data_dir=../data/ --algorithm ERM --dataset ColoredMNIST --test_env 2 --output_dir ./results_tmp"
+    ],
+    "exp_running_dir": "results_tmp/",
+    "do_postprocess": true,
+    "postprocess_commands": [
+        "cp ../../../ml_tasks/Generalization_domainbed/postprocess.py ./",
+        "python postprocess.py --directory ./results_tmp/",
+        "rm postprocess.py"
+    ],
+    "note": "The final_info.json we got from postprocess should be UNDER the exp_running_dir"
+}

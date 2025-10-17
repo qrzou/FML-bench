@@ -1,0 +1,25 @@
+{
+  "cifar10": {
+    "means": {
+      "AUC_mean": 0.8114,
+      "TPR@0.1%FPR_mean": 0.0,
+      "TPR@0.0%FPR_mean": 0.0
+    },
+    "stderrs": {
+      "AUC_stderr": 0.0,
+      "TPR@0.1%FPR_stderr": 0.0,
+      "TPR@0.0%FPR_stderr": 0.0
+    },
+    "final_info_dict": {
+      "AUC": [
+        0.8114
+      ],
+      "TPR@0.1%FPR": [
+        0.0
+      ],
+      "TPR@0.0%FPR": [
+        0.0
+      ]
+    }
+  }
+}

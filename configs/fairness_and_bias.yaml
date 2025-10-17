@@ -1,0 +1,51 @@
+# Default configuration for run_agent_benchmark.py
+
+# Agent configuration
+agent:
+  type: theaiscientist  # Options: theaiscientist
+  model: gpt-5-2025-08-07   # LLM model to use, e.g. gpt-5-2025-08-07, gemini-2.5-pro etc.
+  provider: OpenAI      # Options: OpenAI, Anthropic, OpenRouter, Google, DeepSeek
+  
+  # TheAIScientist specific settings
+  theaiscientist:
+    max_runs: 5           # Maximum number of experiment runs per idea
+    max_retries_per_run: 4  # Maximum retry attempts for failed experiments (previously MAX_ITERS)
+    max_iter: 100            # Optional: Maximum total iterations (runs + retries). If null, defaults to INFINITY, running is bounded by max_runs * max_retries_per_run * num_ideas.
+    max_stderr_output: 1500 # Maximum stderr output to show in retry prompt
+    num_ideas: 25          # Number of ideas to generate
+    num_reflections: 3    # Number of reflections for idea generation
+    skip_novelty_check: true  # Skip novelty checking for generated ideas
+    engine: semanticscholar   # Scholar engine for novelty check
+    use_existing_ideas: false  # Whether to use existing ideas from file
+    ideas_file: null          # Path to existing ideas file (used if use_existing_ideas is true)
+    execute_timeout: 7200     # Timeout for experiment execution commands in seconds (default: 2 hours)
+    preprocess_timeout: 300   # Timeout for preprocessing commands in seconds (default: 5 minutes)
+    postprocess_timeout: 300  # Timeout for postprocessing commands in seconds (default: 5 minutes)
+    use_early_completion: true  # Whether to use early completion for experiment iteration
+
+# Benchmark configuration
+benchmark:
+  name: Fairness_and_Bias_aif360  # Benchmark name (required, no default)
+  
+# Metrics configuration
+metrics:
+  optimization_direction: null  # Options: higher, lower (set to null to use per_metric_direction)
+  
+  # Filter specific datasets and metrics to include in evaluation
+  # If not specified or empty, all datasets and metrics will be used
+  include_datasets: ["adult"]  # List of dataset names to include, e.g., ["adult"]
+  include_metrics: ["abs_aod_mean"]   # List of metric names to include, e.g., ["cls_acc_mean", "balanced_cls_acc_mean", "disparate_impact_mean", "abs_eod_mean"]
+  
+  # You can also specify per-metric direction:
+  per_metric_direction:
+    cls_acc_mean: higher
+    balanced_cls_acc_mean: higher
+    disparate_impact_mean: null
+    abs_disparate_impact_diff_mean: lower
+    eod_mean: null
+    abs_eod_mean: lower
+    aod_mean: null
+    abs_aod_mean: lower
+    theil_index_mean: null
+    abs_theil_index_mean: lower
+

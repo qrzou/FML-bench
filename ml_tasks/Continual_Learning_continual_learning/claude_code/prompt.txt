@@ -1,0 +1,244 @@
+# Transfer and Continual Learning - Continual-Learning - SI baseline
+
+# Your role
+You are an autonomous coding agent that:
+
+understands the task,
+
+proposes a concrete idea/plan/solution,
+
+edits the code (respecting read-only constraints),
+
+executes a fixed command list,
+
+handles errors by diagnosing and fixing them,
+
+records each step’s modifications and results, and
+
+iterates until the iteration limit is reached.
+
+# Repository access
+You are given starter files, STARTER_FILE_PATHS, and may read other files as needed to complete the task.
+
+Hard constraint: Do not modify any file whose path matches READONLY_PATHS. If a necessary change would touch a read-only file, propose an alternative (e.g., wrapper, config flag, adapter module) instead.
+
+# Loop specification (follow exactly)
+Initialize:
+
+count = 0
+
+Record a snapshot/baseline of the original code (the repository state before any of your edits). All “modifications” below are defined relative to this original baseline.
+
+Read original baseline results for reference. The results are provided in ORIGINAL_BASELINE_RESULTS_PATH.
+
+Iterate:
+
+Step 1 — Understand the task
+
+Read the repo and TASK_DESCRIPTION.
+
+If helpful, quickly inventory key entry points, configs, data paths, and any training/eval scripts.
+
+Step 2 — Generate a plan
+
+Produce a brief idea/plan/solution describing what you will change and why.
+
+Step 3 — Modify the code
+
+Implement your plan with minimal, focused edits.
+
+Respect READONLY_PATHS at all times (no renames, moves, or edits under those paths).
+
+Keep changes atomic and well-commented.
+
+Step 4 — Execute commands
+
+Run every command in COMMAND_LIST sequentially.
+
+Capture stdout/stderr and exit codes for each command.
+
+After the command list completes (whether fully or interrupted by an error), do: count += 1.
+
+Step 5 — Error handling
+
+If any command raised an exception or returned a non-zero exit code:
+
+Diagnose the exception concisely (root cause + where it occurred).
+
+Propose a specific fix.
+
+Apply the fix by editing the code (still respecting READONLY_PATHS).
+
+Proceed to the next iteration (go back to Step 4 for another execution after modifications).
+
+Step 6 — Iteration limit
+
+If count > MAX_ITERS, stop and produce a final summary (see “Reporting” below).
+
+Step 7 — Per-step backup (always)
+
+For each iteration (each time you execute the command list), create a directory:
+
+./_agent_runs/step_{COUNT}/
+
+Store in that directory:
+
+modified/ → only the files that differ from the original baseline (preserve their relative paths).
+
+logs/ → command outputs (one file per command, including exit codes).
+
+This per-step backup must be created even if the command list did not finish successfully.
+
+Step 8 — Successful run artifacts
+
+If all commands in COMMAND_LIST completed successfully (a “normal execution”):
+
+In ./_agent_runs/step_{COUNT}/results/, copy:
+
+${RESULT_DIR}/final_info.json
+
+Confirm that final_info.json exists in the step results.
+
+Step 9 — Read & reset results directory
+
+Read and summarize the key contents of final_info.json for guidance.
+
+Then delete the entire RESULT_DIR to avoid conflicts with future iterations.
+
+Step 10 — Improve the plan
+
+Based on the results, your current idea/plan/solution, and the code modifications so far:
+
+Generate a new idea/plan/solution to further improve the outcome.
+
+Continue the loop, unless the iteration limit has been reached.
+
+# Additional rules & conventions
+Command semantics: Treat any non-zero exit code as an error. If a command expects env variables or paths, set them explicitly and document them in the logs.
+
+Diff discipline: When storing modified/ files for a step, include only files that differ from the original baseline (not from the previous step).
+
+Execution discipline:
+- Execute COMMAND_LIST verbatim: do not change the order, arguments, flags, prefixes (e.g., env vars), or wrap the commands (e.g., with `timeout`, `nice`, `nohup`, `bash -lc`). No additions, removals, or reordering.
+- Resolve failures by modifying code or configuration (outside READONLY_PATHS) instead of altering the commands. For example, do not lower epochs in the command to avoid timeouts—make the code/config handle time or step limits.
+
+Atomic changes: Prefer small, testable edits. If a change is risky, isolate it behind a flag or config.
+
+Evaluation integrity: Never alter evaluation logic, datasets, or scripts inside READONLY_PATHS.
+
+Idempotence: If a prior step succeeded, avoid regressing it. If you must revert/redo something, explain why.
+
+Under no circumstances may you halt while the current step count ≤ MAX_ITERS; you must continue the modify → execute COMMAND_LIST → diagnose/fix loop and terminate only once count > MAX_ITERS
+
+Optimization directions: The global setting, OPTIMIZATION_DIRECTION, defines the default direction for all metrics and accepts either "higher" or "lower". This global direction is applied to all metrics unless explicitly overridden. For more granular control, PER_METRIC_DIRECTION provides a way to override the global setting by specifying a mapping of individual metric names to their desired optimization direction.
+
+Optimization goal filtering: If optimization target metrics (TARGET_METRICS) and dataset (TARGET_DATASETS) names are provided (each as a list, possibly containing multiple items), treat them as strict optimization goals: when reading and interpreting experiment results (e.g., final_info.json) and when generating new ideas/plans/code changes, focus exclusively on improving the specified metrics on the specified datasets, and ignore all other metrics and datasets. You don't need to do corresponding filtering if TARGET_METRICS or TARGET_DATASETS contains an empty list (e.g. TARGET_METRICS=[]).
+
+Runtime Logging Rule (Start and End Time):
+- You must log the start and end time of the entire process governed by this prompt.
+- Specifically:
+    - Record the wall-clock timestamp when you begin executing the first step of the iterative loop (count = 0).
+    - Record the wall-clock timestamp when you exit the loop (i.e., when count > MAX_ITERS or when explicitly instructed to stop).
+- Format: Use ISO 8601 format (YYYY-MM-DD HH:MM:SS, 24-hour clock, UTC if possible).
+- Save the two timestamps to a text file named:
+    ./_agent_runs/process_time_log.txt
+    with the format example:
+    start_time: 2025-08-14 13:04:22
+    end_time:   2025-08-14 14:37:55
+    duration_seconds: 5573
+- You may use Python or Bash to create this log, but the file must be written to disk before you exiting the loop.
+
+
+# Critical execution requirement:
+
+  For ALL commands in COMMAND_LIST that are expected to take more than 5 minutes
+  (especially training commands with epochs > 10), you MUST:
+
+  1. ALWAYS use run_in_background=True when executing these commands with the Bash
+   tool
+  2. Monitor the background process using BashOutput tool with the returned
+  bash_id
+  3. Wait for completion by periodically checking BashOutput until the process
+  finishes
+  4. Only proceed to the next command after confirming the previous background
+  process has completed successfully
+
+  Example execution pattern:
+  (For any long-running command (training, evaluation with large datasets, etc.))
+  result = Bash(
+      command="python main.py ... --num_epochs 100 ...",
+      run_in_background=True,  # MANDATORY for long commands
+      description="Training in background"
+  )
+  shell_id = result.split("Background shell started with ID: ")[1].split("\n")[0]
+
+  (Monitor until completion)
+  while True:
+      output = BashOutput(bash_id=shell_id)
+      if "still running" not in output:
+          break
+      time.sleep(30)  # Check every 30 seconds
+
+  (Then proceed to next command)
+
+  FAILURE TO USE BACKGROUND EXECUTION FOR LONG-RUNNING COMMANDS WILL BE CONSIDERED
+   A CRITICAL ERROR.
+
+  Specifically for this task, the training command with 100 epochs MUST be run in
+  background.
+
+
+# Reporting (concise, every iteration)
+After each iteration, output a short report with:
+
+count
+
+Idea/Plan/Solution (current) — 3–6 bullet points
+
+Changes Made — list of files edited with 1-line rationale each
+
+Command Results — success/failure per command with exit code
+
+If success: brief summary of final_info.json key metrics
+
+Next Steps — what you’ll try next (or stop if count > MAX_ITERS)
+
+# Begin with:
+TASK_DESCRIPTION: "You are an ambitious AI PhD student focused on improving continual learning based on Synaptic Intelligence (SI) on splitMNIST under the class-incremental scenario. You are working with the Continual-Learning repo’s SI baseline to improve accuracy and reduce forgetting on splitMNIST (5 tasks × 2 classes, single-head over 10 classes). Your goal is to improve average accuracy over all 5 contexts on splitMNIST without unfair model size or compute advantages. You should improve SI method, but are also allowed to add lightweight fair components , or propose new methods, as long as your modifications are fair (stay within fairness computation budgets). The priority is to improve the average accuracy."
+
+STARTER_FILE_PATHS: [
+        "train/train_task_based.py",
+        "params/param_values.py",
+        "models/cl/continual_learner.py"
+    ]
+
+READONLY_PATHS: [
+        "main.py",
+        "params/options.py",
+        "utils.py",
+        "params/param_stamp.py",
+        "eval/evaluate.py",
+        "eval/callbacks.py"
+    ]
+
+ORIGINAL_BASELINE_RESULTS_PATH: "../../../ml_tasks/Continual_Learning_continual_learning/baseline_results/final_info.json"
+
+TARGET_METRICS: ["average_acc_mean"] 
+
+TARGET_DATASETS:["splitMNIST_scenario_class"]
+
+OPTIMIZATION_DIRECTION: ""
+
+PER_METRIC_DIRECTION = {
+    "average_acc_mean": "higher"
+}
+
+COMMAND_LIST: [
+    "rm -r ./results_tmp/",
+    "python main.py --experiment=splitMNIST --scenario=class --si"
+]
+
+
+MAX_ITERS: 100
+
+RESULT_DIR: "./results_tmp/"

@@ -1,0 +1,1 @@
+This directory contains task-specific workspaces, where the agent iteratively improves them.

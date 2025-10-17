@@ -1,0 +1,11 @@
+[
+    {
+        "Name": "adaptive_targeted_regularization",
+        "Title": "Adaptive Targeted Regularization for DragonNet",
+        "Experiment": "Dynamically adjust the targeted regularization strength in DragonNet during training based on validation ITE error or propensity score overlap. Evaluate the impact on ATE/ITE estimation accuracy on IHDP and synthetic datasets.",
+        "Interestingness": 8,
+        "Feasibility": 7,
+        "Novelty": 7,
+        "novel": true
+    }
+]

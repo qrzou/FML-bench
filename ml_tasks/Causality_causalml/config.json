@@ -1,0 +1,39 @@
+{
+    "repo_dir": "workspace/Causality_causalml/causalml",
+    "target_files": [
+        "causalml/inference/tf/dragonnet.py",
+        "causalml/inference/tf/utils.py"
+    ],
+    "related_files": [
+
+    ],
+    "read_only_files": [
+        "train.py"
+    ],
+    "starter_file": "",
+    "backup_excluded_files": [
+        ".aider.tags.cache.v4/",
+        "results_tmp/"
+    ],
+    "conda_env": "causalml",
+    "prepare_setup_files": true,
+    "setup_commands": [
+        "cp ../../../ml_tasks/Causality_causalml/train.py ./"
+    ],
+    "do_preprocess": true,
+    "preprocess_note": "We need to copy the train.py to the workspace before running the experiment, because the coder has chance to write to the files",
+    "preprocess_commands": [
+        "cp ../../../ml_tasks/Causality_causalml/train.py ./"
+    ],
+    "execute_commands": [
+        "python train.py"
+    ],
+    "exp_running_dir": "results_tmp/",
+    "do_postprocess": true,
+    "postprocess_commands": [
+        "cp ../../../ml_tasks/Causality_causalml/postprocess.py ./",
+        "python postprocess.py",
+        "rm ./postprocess.py"
+    ],
+    "note": "The final_info.json we got from postprocess should be UNDER the exp_running_dir"
+}

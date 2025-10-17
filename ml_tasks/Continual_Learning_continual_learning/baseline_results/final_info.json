@@ -1,0 +1,15 @@
+{
+  "splitMNIST_scenario_class": {
+    "means": {
+      "average_acc_mean": 0.2710061983670389
+    },
+    "stderrs": {
+      "average_acc_stderr": 0.0
+    },
+    "final_info_dict": {
+      "average_acc": [
+        0.2710061983670389
+      ]
+    }
+  }
+}

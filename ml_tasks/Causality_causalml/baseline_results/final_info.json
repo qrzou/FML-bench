@@ -1,0 +1,58 @@
+{
+  "ihdp_test": {
+    "means": {
+      "ate_mean": 3.942185163497925,
+      "mae_mean": 1.1445137983745477,
+      "auuc_mean": 0.527326597505644
+    },
+    "stderrs": {
+      "ate_stderr": 0.0,
+      "mae_stderr": 0.0,
+      "auuc_stderr": 0.0
+    },
+    "final_info_dict": {
+      "ate": [
+        3.942185163497925
+      ],
+      "mae": [
+        1.1445137983745477
+      ],
+      "auuc": [
+        0.527326597505644
+      ]
+    }
+  },
+  "synthetic_test": {
+    "means": {
+      "ate_mean": 0.5815507769584656,
+      "mse_mean": 0.0525746894402169,
+      "abs_pct_error_of_ate_mean": 0.2056577610115422,
+      "kl_divergence_mean": 0.7665340798932109,
+      "auuc_mean": 0.6045607760154607
+    },
+    "stderrs": {
+      "ate_stderr": 0.0,
+      "mse_stderr": 0.0,
+      "abs_pct_error_of_ate_stderr": 0.0,
+      "kl_divergence_stderr": 0.0,
+      "auuc_stderr": 0.0
+    },
+    "final_info_dict": {
+      "ate": [
+        0.5815507769584656
+      ],
+      "mse": [
+        0.0525746894402169
+      ],
+      "abs_pct_error_of_ate": [
+        0.2056577610115422
+      ],
+      "kl_divergence": [
+        0.7665340798932109
+      ],
+      "auuc": [
+        0.6045607760154607
+      ]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+[
+    {
+        "Name": "adaptive_task_specific_regularization",
+        "Title": "Adaptive Task-Specific Regularization for Few-Shot Learning",
+        "Experiment": "Dynamically adjust the regularization strength in the FewShotClassifier during meta-training based on per-task validation accuracy or intra-class variance within the support set. Evaluate the impact on generalization to novel classes using N-way K-shot classification accuracy on the CUB dataset.",
+        "Interestingness": 8,
+        "Feasibility": 7,
+        "Novelty": 7,
+        "novel": true
+    }
+]

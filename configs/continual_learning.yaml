@@ -1,0 +1,45 @@
+# Default configuration for run_agent_benchmark.py
+
+# Agent configuration
+agent:
+  type: theaiscientist  # Options: theaiscientist
+  model: gpt-5-2025-08-07   # LLM model to use, e.g. gpt-5-2025-08-07, gemini-2.5-pro etc.
+  provider: OpenAI      # Options: OpenAI, Anthropic, OpenRouter, Google, DeepSeek
+  
+  # TheAIScientist specific settings
+  theaiscientist:
+    max_runs: 5           # Maximum number of experiment runs per idea
+    max_retries_per_run: 4  # Maximum retry attempts for failed experiments (previously MAX_ITERS)
+    max_iter: 100            # Optional: Maximum total iterations (runs + retries). If null, defaults to INFINITY, running is bounded by max_runs * max_retries_per_run * num_ideas.
+    max_stderr_output: 1500 # Maximum stderr output to show in retry prompt
+    num_ideas: 25          # Number of ideas to generate
+    num_reflections: 3    # Number of reflections for idea generation
+    prepare_setup_files_before_gen_ideas: false  # Prepare setup files before generating ideas, especially for replacing the original files which need to be modified as target files
+    skip_novelty_check: true  # Skip novelty checking for generated ideas
+    engine: semanticscholar   # Scholar engine for novelty check
+    use_existing_ideas: false  # Whether to use existing ideas from file
+    ideas_file: null          # Path to existing ideas file (used if use_existing_ideas is true)
+    execute_timeout: 7200     # Timeout for experiment execution commands in seconds (default: 2 hours)
+    preprocess_timeout: 300   # Timeout for preprocessing commands in seconds (default: 5 minutes)
+    postprocess_timeout: 300  # Timeout for postprocessing commands in seconds (default: 5 minutes)
+    use_early_completion: true  # Whether to use early completion for experiment iteration
+
+# Benchmark configuration
+benchmark:
+  name: Continual_Learning_continual_learning  # Benchmark name (required, no default)
+  
+# Metrics configuration
+metrics:
+  optimization_direction: null  # Options: higher, lower (set to null to use per_metric_direction)
+  
+  # Filter specific datasets and metrics to include in evaluation
+  # If not specified or empty, all datasets and metrics will be used
+  include_datasets: ["splitMNIST_scenario_class"]  # List of dataset names to include, e.g., ["splitMNIST_scenario_class"]
+  include_metrics: ["average_acc_mean"]   # List of metric names to include, e.g., ["average_acc_mean"]
+  
+  # You can also specify per-metric direction:
+  per_metric_direction:
+    average_acc_mean: higher
+
+
+

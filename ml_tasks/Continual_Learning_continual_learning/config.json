@@ -1,0 +1,48 @@
+{
+    "repo_dir": "workspace/Continual_Learning_continual_learning/continual-learning",
+    "target_files": [
+        "train/train_task_based.py",
+        "params/param_values.py",
+        "models/cl/continual_learner.py"
+    ],
+    "related_files": [
+
+    ],
+    "read_only_files": [
+        "main.py",
+        "params/options.py",
+        "utils.py",
+        "params/param_stamp.py",
+        "eval/evaluate.py",
+        "eval/callbacks.py"
+    ],
+    "starter_file": "",
+    "backup_excluded_files": [
+        ".aider.tags.cache.v4/",
+        "results_tmp/"
+    ],
+    "conda_env": "continual_learning",
+    "prepare_setup_files": true,
+    "setup_commands": [
+        "cp ../../../ml_tasks/Continual_Learning_continual_learning/main_benchmark.py ./main.py",
+        "cp ../../../ml_tasks/Continual_Learning_continual_learning/options_benchmark.py ./params/options.py"
+    ],
+    "do_preprocess": true,
+    "preprocess_note": "We need to copy the main.py and some other related files to the workspace before running the experiment, because the coder has chance to write to the files",
+    "preprocess_commands": [
+        "cp ../../../ml_tasks/Continual_Learning_continual_learning/main_benchmark.py ./main.py",
+        "cp ../../../ml_tasks/Continual_Learning_continual_learning/options_benchmark.py ./params/options.py",
+        "cp ../../../ml_tasks/Continual_Learning_continual_learning/original_file_backup/utils.py ./utils.py",
+        "cp ../../../ml_tasks/Continual_Learning_continual_learning/original_file_backup/param_stamp.py ./params/param_stamp.py",
+        "cp ../../../ml_tasks/Continual_Learning_continual_learning/original_file_backup/evaluate.py ./eval/evaluate.py",
+        "cp ../../../ml_tasks/Continual_Learning_continual_learning/original_file_backup/callbacks.py ./eval/callbacks.py"
+    ],
+    "execute_commands": [
+        "python main.py --experiment=splitMNIST --scenario=class --si"
+    ],
+    "exp_running_dir": "results_tmp/",
+    "do_postprocess": false,
+    "postprocess_commands": [
+    ],
+    "note": "The final_info.json we got from postprocess should be UNDER the exp_running_dir"
+}

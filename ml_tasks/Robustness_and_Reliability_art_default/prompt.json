@@ -1,0 +1,4 @@
+{
+    "system": "You are an ambitious AI PhD student focused on improving robust learning under data poisoning and privacy constraints.",
+    "task_description": "You are given the Adversarial Robustness Toolbox (ART) codebase with a focus on the dp_instahide defense. dp_instahide mixes inputs with public data and applies differential privacy noise to hinder inversion and poisoning. While designed for privacy-preserving training, its structure offers headroom to harden against both clean-label and trigger/backdoor poisons. Your goal is to improve defense performance against diverse poisoning attacks while maintaining high clean accuracy. You may tune dp_instahide, compose it with other defenses, or propose a new method if it outperforms baselines."
+}

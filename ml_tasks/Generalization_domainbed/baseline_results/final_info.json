@@ -1,0 +1,15 @@
+{
+  "ColoredMNIST_test_env2": {
+    "means": {
+      "in_acc_mean": 0.22542454599025016
+    },
+    "stderrs": {
+      "in_acc_stderr": 0.0
+    },
+    "final_info_dict": {
+      "in_acc": [
+        0.22542454599025016
+      ]
+    }
+  }
+}
