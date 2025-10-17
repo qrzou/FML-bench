@@ -187,7 +187,7 @@ See this [tutorial](docs/CUSTOM_TASK_TUTORIAL.md) for details.
 ### Leaderboard
 
 <p align="center">
-    <img src="docs/figs/leaderboard.png" style="width: 43em" alt="Leaderboard" />
+    <img src="docs/figs/leaderboard_small.png" style="width: 43em" alt="Leaderboard" />
 </p>
 
 
