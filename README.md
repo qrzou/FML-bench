@@ -1,7 +1,7 @@
 
 <p align="center">
   <a href="https://github.com/qrzou/FML-bench">
-    <img src="docs/figs/main_logo_v3.png" style="height: 10em" alt="FML-bench" />
+    <img src="docs/figs/main_logo_v3.png" style="width: 33em" alt="FML-bench" />
   </a>
 </p>
 
