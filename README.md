@@ -46,7 +46,7 @@ We provide agents with task specification including task description, baseline c
 Agents are required to iteratively improve the baseline method based on the provided inputs to advance ML research!
 
 
-![Overview](docs/figs/overview_v5.png)
+![Overview](docs/figs/overview_v5_small.png)
 
 
 
