@@ -20,7 +20,7 @@
 
 
 
-Official implements of [FML-bench: A Benchmark for Automatic ML Research Agents Highlighting the Importance of  Exploration Breadth](https://arxiv.org/abs/2510.10472)
+Official implementation of [FML-bench: A Benchmark for Automatic ML Research Agents Highlighting the Importance of  Exploration Breadth](https://arxiv.org/abs/2510.10472)
 
 
 
