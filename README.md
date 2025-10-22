@@ -36,11 +36,9 @@ It focuses on evaluating agents’ scientific research capabilities rather than 
 **✨ Key Features**
 
 - **🔬 Fundamental ML Problems** - Focus on core ML research challenges rather than downstream application
-- **💻 Real-world Codebases** - Direct integration with existing real-world GitHub repositories, offering more realistic challenges.
+- **💻 Real-world Codebases** - Direct integration with existing real-world GitHub repositories, offering more realistic challenges
 - **🔧 Low Coding Barrier** - Start from baseline's codebase rather than dataset only
-- **📈 Extensible by Design** - Easy to add existing real-world ML repositories with minimal adapters, enabling quick customization into user-defined benchmarks
-
-
+- **📈 Extensible by Design** - Easy to add existing real-world ML repositories with minimal adapters, enabling quick customization into user-defined benchmarks across ML and AI for Science domains
 
 We provide agents with task specification including task description, baseline code & results, execution guidance to access guidance, and integrity-protected evaluation.
 Agents are required to iteratively improve the baseline method based on the provided inputs to advance ML research!
