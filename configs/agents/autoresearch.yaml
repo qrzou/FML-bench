@@ -1,0 +1,9 @@
+# Autoresearch agent configuration
+# Based on Karpathy's autoresearch greedy hill-climbing protocol
+# Source: https://github.com/karpathy/autoresearch
+agent:
+  type: autoresearch
+  autoresearch:
+    max_debug_retries: 3       # "more than a few attempts" before giving up
+    max_stderr_output: 1500    # consistent with other agents
+    execute_timeout: 2400      # per-experiment timeout in seconds

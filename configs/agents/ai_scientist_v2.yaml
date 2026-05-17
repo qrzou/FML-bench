@@ -1,0 +1,19 @@
+# AI Scientist v2 agent configuration
+# Based on AI Scientist v2 BFTS (arXiv:2504.08066)
+# Source: https://github.com/sakanaai/ai-scientist-v2
+agent:
+  type: ai_scientist_v2
+  ai_scientist_v2:
+    execute_timeout: 2400
+    # Idea generation params (reuses TASv1's generate_ideas)
+    num_ideas: 3
+    num_reflections: 3
+    # BFTS search params (from original bfts_config.yaml)
+    # num_drafts is derived from len(ideas), not set here
+    debug_prob: 0.5
+    max_debug_depth: 3
+    max_stderr_output: 1500
+    # Simulated parallel batch selection (original: 4 workers)
+    num_parallel: 4
+    # 4-stage pipeline budget ratios (basic/tuning/creative/ablation)
+    stage_budgets: [0.10, 0.20, 0.50, 0.20]

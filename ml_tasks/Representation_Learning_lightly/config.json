@@ -1,0 +1,14 @@
+{
+    "repo_dir": "workspace/Representation_Learning_lightly/lightly",
+    "pinned_commit": "e87686a9b284b6ca88684176cfdc90d26c77f0f6",
+    "conda_env": "lightly",
+    "target_files": [
+        "model.py",
+        "transform.py",
+        "split_config.json"
+    ],
+    "val_command": "cp ../../../ml_tasks/Representation_Learning_lightly/original_file_backup/models/utils.py ./lightly/models/ && cp ../../../ml_tasks/Representation_Learning_lightly/original_file_backup/transforms/utils.py ./lightly/transforms/ && cp ../../../ml_tasks/Representation_Learning_lightly/train_eval_baseline.py ./ && python train_eval_baseline.py --split val",
+    "test_command": "cp ../../../ml_tasks/Representation_Learning_lightly/original_file_backup/models/utils.py ./lightly/models/ && cp ../../../ml_tasks/Representation_Learning_lightly/original_file_backup/transforms/utils.py ./lightly/transforms/ && cp ../../../ml_tasks/Representation_Learning_lightly/train_eval_baseline.py ./ && python train_eval_baseline.py --split test",
+    "metric": "test_acc_mean",
+    "metric_direction": "higher"
+}

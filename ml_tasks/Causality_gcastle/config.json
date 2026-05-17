@@ -1,0 +1,12 @@
+{
+    "repo_dir": "workspace/Causality_gcastle/trustworthyAI/gcastle",
+    "pinned_commit": "58abc35",
+    "conda_env": "gcastle",
+    "target_files": [
+        "algorithm.py"
+    ],
+    "val_command": "cp ../../../../ml_tasks/Causality_gcastle/train_eval_baseline.py ./ && python train_eval_baseline.py --split val",
+    "test_command": "cp ../../../../ml_tasks/Causality_gcastle/train_eval_baseline.py ./ && python train_eval_baseline.py --split test",
+    "metric": "shd_mean",
+    "metric_direction": "lower"
+}

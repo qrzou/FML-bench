@@ -1,0 +1,12 @@
+benchmark:
+  name: Fairness_fairlearn
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["adult"]
+  include_metrics: ["abs_demographic_parity_diff_mean"]
+  per_metric_direction:
+    accuracy_mean: higher
+    balanced_accuracy_mean: higher
+    abs_equalized_odds_diff_mean: lower
+    abs_demographic_parity_diff_mean: lower

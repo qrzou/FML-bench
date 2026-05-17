@@ -1,0 +1,12 @@
+{
+    "repo_dir": "workspace/Continual_Learning_pycil/PyCIL",
+    "pinned_commit": "f3509b8",
+    "conda_env": "pycil",
+    "target_files": [
+        "models/icarl.py"
+    ],
+    "val_command": "cp ../../../ml_tasks/Continual_Learning_pycil/train_eval_baseline.py ./ && python train_eval_baseline.py --split val",
+    "test_command": "cp ../../../ml_tasks/Continual_Learning_pycil/train_eval_baseline.py ./ && python train_eval_baseline.py --split test",
+    "metric": "avg_incremental_acc_mean",
+    "metric_direction": "higher"
+}

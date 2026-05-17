@@ -1,0 +1,10 @@
+{
+    "repo_dir": "workspace/Unlearning_open_unlearning/open-unlearning",
+    "pinned_commit": "4ad738a",
+    "conda_env": "open_unlearning",
+    "target_files": ["algorithm.py"],
+    "val_command": "cp ../../../ml_tasks/Unlearning_open_unlearning/train_eval_baseline.py ./ && cp ../../../ml_tasks/Unlearning_open_unlearning/retain_reference_logs.json ./ && python train_eval_baseline.py --split val",
+    "test_command": "cp ../../../ml_tasks/Unlearning_open_unlearning/train_eval_baseline.py ./ && cp ../../../ml_tasks/Unlearning_open_unlearning/retain_reference_logs.json ./ && python train_eval_baseline.py --split test",
+    "metric": "forget_quality_mean",
+    "metric_direction": "higher"
+}

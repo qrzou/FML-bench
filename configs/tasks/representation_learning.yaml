@@ -1,0 +1,9 @@
+benchmark:
+  name: Representation_Learning_lightly
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["cifar10_linear_probing"]
+  include_metrics: ["test_acc_mean"]
+  per_metric_direction:
+    test_acc_mean: higher

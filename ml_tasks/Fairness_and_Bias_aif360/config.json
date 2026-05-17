@@ -1,0 +1,12 @@
+{
+    "repo_dir": "workspace/Fairness_and_Bias_aif360/AIF360",
+    "pinned_commit": "cf4ed193424306d3a6eb87890930a386557db26a",
+    "conda_env": "aif360",
+    "target_files": [
+        "aif360/algorithms/inprocessing/adversarial_debiasing.py"
+    ],
+    "val_command": "cp ../../../ml_tasks/Fairness_and_Bias_aif360/original_file_backup/classification_metric.py ./aif360/metrics/ && cp ../../../ml_tasks/Fairness_and_Bias_aif360/original_file_backup/data_preproc_functions.py ./aif360/algorithms/preprocessing/optim_preproc_helpers/ && cp ../../../ml_tasks/Fairness_and_Bias_aif360/train_eval_baseline.py ./ && python train_eval_baseline.py --split val",
+    "test_command": "cp ../../../ml_tasks/Fairness_and_Bias_aif360/original_file_backup/classification_metric.py ./aif360/metrics/ && cp ../../../ml_tasks/Fairness_and_Bias_aif360/original_file_backup/data_preproc_functions.py ./aif360/algorithms/preprocessing/optim_preproc_helpers/ && cp ../../../ml_tasks/Fairness_and_Bias_aif360/train_eval_baseline.py ./ && python train_eval_baseline.py --split test",
+    "metric": "abs_aod_mean",
+    "metric_direction": "lower"
+}

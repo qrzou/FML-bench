@@ -1,0 +1,11 @@
+# AIDE agent configuration
+# Based on AIDE (Weco) tree-search ML research agent
+# Source: https://github.com/WecoAI/aideml
+agent:
+  type: aide
+  aide:
+    num_drafts: 5
+    debug_prob: 0.5
+    max_debug_depth: 3
+    max_stderr_output: 1500
+    execute_timeout: 2400

@@ -1,0 +1,13 @@
+{
+    "repo_dir": "workspace/Data_Efficiency_easyfsl/easy-few-shot-learning",
+    "pinned_commit": "8023ff49a02a68830c10a21b8eb908cb33bdf1b9",
+    "conda_env": "easyfsl",
+    "target_files": [
+        "easyfsl/methods/few_shot_classifier.py",
+        "easyfsl/methods/prototypical_networks.py"
+    ],
+    "val_command": "cp ../../../ml_tasks/Data_Efficiency_easyfsl/eval.py ./ && cp ../../../ml_tasks/Data_Efficiency_easyfsl/original_file_backup/benchmark_methods.py ./scripts/ && python eval.py --split val",
+    "test_command": "cp ../../../ml_tasks/Data_Efficiency_easyfsl/eval.py ./ && cp ../../../ml_tasks/Data_Efficiency_easyfsl/original_file_backup/benchmark_methods.py ./scripts/ && python eval.py --split test",
+    "metric": "accuracy_mean",
+    "metric_direction": "higher"
+}

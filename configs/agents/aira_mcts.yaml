@@ -1,0 +1,7 @@
+# AIRA-MCTS agent configuration
+# Based on the AIRA-dojo MCTS solver (UCT-driven tree search)
+# Source: https://github.com/facebookresearch/aira-dojo
+agent:
+  type: aira_mcts
+  aira_mcts:
+    execute_timeout: 2400

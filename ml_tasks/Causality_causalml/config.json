@@ -1,0 +1,14 @@
+{
+    "repo_dir": "workspace/Causality_causalml/causalml",
+    "pinned_commit": "1a96e01f67496c3846d0e8146e5dd90ae9eb21a6",
+    "conda_env": "causalml",
+    "target_files": [
+        "causalml/inference/tf/dragonnet.py",
+        "causalml/inference/tf/utils.py",
+        "split_config.json"
+    ],
+    "val_command": "cp ../../../ml_tasks/Causality_causalml/train.py ./ && python train.py --split val",
+    "test_command": "cp ../../../ml_tasks/Causality_causalml/train.py ./ && python train.py --split test",
+    "metric": "mae_mean",
+    "metric_direction": "lower"
+}

@@ -1,0 +1,30 @@
+# OpenEvolve agent configuration
+# Based on OpenEvolve (open-source AlphaEvolve), MAP-Elites evolutionary optimization
+# Source: https://github.com/codelion/openevolve  Paper: arXiv:2506.13131
+agent:
+  type: openevolve
+  openevolve:
+    # Island model
+    num_islands: 3
+    feature_bins: 5
+    # Population
+    archive_size: 30
+    # Sampling ratios (from OpenEvolve defaults)
+    exploration_ratio: 0.2
+    exploitation_ratio: 0.7
+    # Migration
+    migration_interval: 10
+    migration_rate: 0.1
+    # Prompt context
+    num_top_programs: 3
+    num_inspirations: 3
+    # Inspiration sampling: fraction of n used as top-elite slots (matches original default)
+    elite_selection_ratio: 0.1
+    # Debug handling
+    max_debug_depth: 2
+    debug_prob: 0.3
+    # Execution
+    max_stderr_output: 1500
+    execute_timeout: 2400
+    # Diversity
+    diversity_reference_size: 10

@@ -1,0 +1,40 @@
+{
+  "compas": {
+    "means": {
+      "cls_acc_mean": 0.6757894736842105,
+      "balanced_cls_acc_mean": 0.6833825412635173,
+      "disparate_impact_mean": 0.641825637368515,
+      "abs_disparate_impact_diff_mean": 0.35817436263148505,
+      "eod_mean": -0.2098850574712644,
+      "abs_eod_mean": 0.2098850574712644,
+      "aod_mean": -0.2657268424611224,
+      "abs_aod_mean": 0.2657268424611224,
+      "theil_index_mean": 0.1452485661584509,
+      "abs_theil_index_mean": 0.1452485661584509
+    },
+    "stderrs": {
+      "cls_acc_stderr": 0.0,
+      "balanced_cls_acc_stderr": 0.0,
+      "disparate_impact_stderr": 0.0,
+      "abs_disparate_impact_diff_stderr": 0.0,
+      "eod_stderr": 0.0,
+      "abs_eod_stderr": 0.0,
+      "aod_stderr": 0.0,
+      "abs_aod_stderr": 0.0,
+      "theil_index_stderr": 0.0,
+      "abs_theil_index_stderr": 0.0
+    },
+    "final_info_dict": {
+      "cls_acc": 0.6757894736842105,
+      "balanced_cls_acc": 0.6833825412635173,
+      "disparate_impact": 0.641825637368515,
+      "abs_disparate_impact_diff": 0.35817436263148505,
+      "eod": -0.2098850574712644,
+      "abs_eod": 0.2098850574712644,
+      "aod": -0.2657268424611224,
+      "abs_aod": 0.2657268424611224,
+      "theil_index": 0.1452485661584509,
+      "abs_theil_index": 0.1452485661584509
+    }
+  }
+}

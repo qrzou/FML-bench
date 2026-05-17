@@ -1,0 +1,13 @@
+{
+    "repo_dir": "workspace/Fairness_fairlearn/fairlearn",
+    "pinned_commit": "0173555",
+    "conda_env": "fairlearn",
+    "target_files": [
+        "algorithm.py",
+        "split_config.json"
+    ],
+    "val_command": "cp ../../../ml_tasks/Fairness_fairlearn/train_eval_baseline.py ./ && python train_eval_baseline.py --split val",
+    "test_command": "cp ../../../ml_tasks/Fairness_fairlearn/train_eval_baseline.py ./ && python train_eval_baseline.py --split test",
+    "metric": "abs_demographic_parity_diff_mean",
+    "metric_direction": "lower"
+}

@@ -1,0 +1,15 @@
+{
+  "cifar10_linear_probing": {
+    "means": {
+      "test_acc_mean": 0.7561999559402466
+    },
+    "stderrs": {
+      "test_acc_stderr": 0.0
+    },
+    "final_info_dict": {
+      "test_acc": [
+        0.7561999559402466
+      ]
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "poisoned_mnist": {
+    "means": {
+      "clean_acc_mean": 0.9485,
+      "poison_acc_mean": 0.44954314720812183,
+      "resist_acc_mean": 0.5504568527918782,
+      "defense_score_mean": 0.6966288908191652
+    },
+    "stderrs": {
+      "clean_acc_stderr": 0.0,
+      "poison_acc_stderr": 0.0,
+      "resist_acc_stderr": 0.0,
+      "defense_score_stderr": 0.0
+    },
+    "final_info_dict": {
+      "clean_acc": [
+        0.9485
+      ],
+      "poison_acc": [
+        0.44954314720812183
+      ],
+      "resist_acc": [
+        0.5504568527918782
+      ],
+      "defense_score": [
+        0.6966288908191652
+      ]
+    }
+  }
+}

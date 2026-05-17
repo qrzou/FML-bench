@@ -1,0 +1,20 @@
+# TheAIScientist (v1) agent configuration
+# Based on The AI Scientist (Sakana AI), arXiv:2408.06292
+# Source: https://github.com/SakanaAI/AI-Scientist
+agent:
+  type: theaiscientist
+  theaiscientist:
+    max_runs: 5
+    max_retries_per_run: 4
+    max_iter: 100
+    max_stderr_output: 1500
+    num_ideas: 25
+    num_reflections: 3
+    skip_novelty_check: true
+    engine: semanticscholar
+    use_existing_ideas: false
+    ideas_file: null
+    execute_timeout: 2400
+    preprocess_timeout: 300
+    postprocess_timeout: 300
+    use_early_completion: true

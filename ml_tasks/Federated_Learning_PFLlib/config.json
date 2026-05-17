@@ -1,0 +1,10 @@
+{
+    "repo_dir": "workspace/Federated_Learning_PFLlib/PFLlib",
+    "pinned_commit": "0169ba7",
+    "conda_env": "pfllib",
+    "target_files": ["algorithm.py", "split_config.json"],
+    "val_command": "cp ../../../ml_tasks/Federated_Learning_PFLlib/train_eval_baseline.py ./ && python train_eval_baseline.py --split val",
+    "test_command": "cp ../../../ml_tasks/Federated_Learning_PFLlib/train_eval_baseline.py ./ && python train_eval_baseline.py --split test",
+    "metric": "test_acc_mean",
+    "metric_direction": "higher"
+}

@@ -1,0 +1,10 @@
+benchmark:
+  name: Unlearning_open_unlearning
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["tofu_unlearning"]
+  include_metrics: ["forget_quality_mean"]
+  per_metric_direction:
+    forget_quality_mean: higher
+    model_utility_mean: higher

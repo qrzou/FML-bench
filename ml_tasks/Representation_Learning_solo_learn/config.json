@@ -1,0 +1,13 @@
+{
+    "repo_dir": "workspace/Representation_Learning_solo_learn/solo-learn",
+    "pinned_commit": "b69b4bd",
+    "conda_env": "sololearn",
+    "target_files": [
+        "algorithm.py",
+        "split_config.json"
+    ],
+    "val_command": "cp ../../../ml_tasks/Representation_Learning_solo_learn/train_eval_baseline.py ./ && python train_eval_baseline.py --split val",
+    "test_command": "cp ../../../ml_tasks/Representation_Learning_solo_learn/train_eval_baseline.py ./ && python train_eval_baseline.py --split test",
+    "metric": "linear_eval_acc_mean",
+    "metric_direction": "higher"
+}

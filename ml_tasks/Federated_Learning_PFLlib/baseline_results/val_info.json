@@ -1,0 +1,16 @@
+{
+  "cifar10_fl": {
+    "means": {
+      "test_acc_mean": 0.4405712594723812,
+      "test_acc_std_mean": 0.1841846227432485
+    },
+    "stderrs": {
+      "test_acc_stderr": 0.0,
+      "test_acc_std_stderr": 0.0
+    },
+    "final_info_dict": {
+      "test_acc": 0.4405712594723812,
+      "test_acc_std": 0.1841846227432485
+    }
+  }
+}

@@ -1,0 +1,12 @@
+benchmark:
+  name: Causality_gcastle
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["synthetic_dag"]
+  include_metrics: ["shd_mean"]
+  per_metric_direction:
+    shd_mean: lower
+    f1_mean: higher
+    fdr_mean: lower
+    tpr_mean: higher

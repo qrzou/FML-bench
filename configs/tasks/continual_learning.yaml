@@ -1,0 +1,9 @@
+benchmark:
+  name: Continual_Learning_continual_learning
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["splitMNIST_scenario_class"]
+  include_metrics: ["average_acc_mean"]
+  per_metric_direction:
+    average_acc_mean: higher

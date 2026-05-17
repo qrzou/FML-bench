@@ -1,0 +1,9 @@
+benchmark:
+  name: Continual_Learning_pycil
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["cifar100_incremental"]
+  include_metrics: ["avg_incremental_acc_mean"]
+  per_metric_direction:
+    avg_incremental_acc_mean: higher

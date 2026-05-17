@@ -1,0 +1,15 @@
+{
+  "miniimagenet_test": {
+    "means": {
+      "accuracy_mean": 65.47
+    },
+    "stderrs": {
+      "accuracy_stderr": 0.0
+    },
+    "final_info_dict": {
+      "accuracy": [
+        65.47
+      ]
+    }
+  }
+}

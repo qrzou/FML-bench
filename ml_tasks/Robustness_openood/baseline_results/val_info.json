@@ -1,0 +1,16 @@
+{
+  "openood": {
+    "means": {
+      "auroc_mean": 0.8757909632571994,
+      "fpr95_mean": 0.6049
+    },
+    "stderrs": {
+      "auroc_stderr": 0.0,
+      "fpr95_stderr": 0.0
+    },
+    "final_info_dict": {
+      "auroc": 0.8757909632571994,
+      "fpr95": 0.6049
+    }
+  }
+}

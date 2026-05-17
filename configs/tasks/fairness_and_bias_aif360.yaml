@@ -1,0 +1,18 @@
+benchmark:
+  name: Fairness_and_Bias_aif360
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["compas"]
+  include_metrics: ["abs_aod_mean"]
+  per_metric_direction:
+    cls_acc_mean: higher
+    balanced_cls_acc_mean: higher
+    disparate_impact_mean: null
+    abs_disparate_impact_diff_mean: lower
+    eod_mean: null
+    abs_eod_mean: lower
+    aod_mean: null
+    abs_aod_mean: lower
+    theil_index_mean: null
+    abs_theil_index_mean: lower

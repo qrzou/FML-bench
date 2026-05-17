@@ -1,0 +1,13 @@
+{
+    "repo_dir": "workspace/Generalization_domainbed/DomainBed",
+    "pinned_commit": "b93c22a1cfc3b2428398272c1a116c8de1f4139e",
+    "conda_env": "domainbed",
+    "target_files": [
+        "domainbed/algorithms.py",
+        "domainbed/networks.py"
+    ],
+    "val_command": "cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/train.py ./domainbed/scripts/ && cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/datasets.py ./domainbed/ && cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/hparams_registry.py ./domainbed/ && cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/model_selection.py ./domainbed/ && cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/misc.py ./domainbed/lib/ && cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/fast_data_loader.py ./domainbed/lib/ && cp ../../../ml_tasks/Generalization_domainbed/train_eval.py ./ && python train_eval.py --split val",
+    "test_command": "cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/train.py ./domainbed/scripts/ && cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/datasets.py ./domainbed/ && cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/hparams_registry.py ./domainbed/ && cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/model_selection.py ./domainbed/ && cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/misc.py ./domainbed/lib/ && cp ../../../ml_tasks/Generalization_domainbed/original_file_backup/fast_data_loader.py ./domainbed/lib/ && cp ../../../ml_tasks/Generalization_domainbed/train_eval.py ./ && python train_eval.py --split test",
+    "metric": "in_acc_mean",
+    "metric_direction": "higher"
+}

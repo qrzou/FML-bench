@@ -1,0 +1,19 @@
+{
+  "cifar100_incremental": {
+    "means": {
+      "avg_incremental_acc_mean": 0.5951666666666667,
+      "avg_acc_cnn_mean": 0.53415,
+      "avg_acc_nme_mean": 0.5951666666666667
+    },
+    "stderrs": {
+      "avg_incremental_acc_stderr": 0.0,
+      "avg_acc_cnn_stderr": 0.0,
+      "avg_acc_nme_stderr": 0.0
+    },
+    "final_info_dict": {
+      "avg_incremental_acc": 0.5951666666666667,
+      "avg_acc_cnn": 0.53415,
+      "avg_acc_nme": 0.5951666666666667
+    }
+  }
+}

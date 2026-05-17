@@ -1,0 +1,22 @@
+{
+  "synthetic_dag": {
+    "means": {
+      "shd_mean": 72.0,
+      "f1_mean": 0.45454545454545453,
+      "fdr_mean": 0.0625,
+      "tpr_mean": 0.3
+    },
+    "stderrs": {
+      "shd_stderr": 0.0,
+      "f1_stderr": 0.0,
+      "fdr_stderr": 0.0,
+      "tpr_stderr": 0.0
+    },
+    "final_info_dict": {
+      "shd": 72.0,
+      "f1": 0.45454545454545453,
+      "fdr": 0.0625,
+      "tpr": 0.3
+    }
+  }
+}

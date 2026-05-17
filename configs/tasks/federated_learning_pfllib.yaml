@@ -1,0 +1,10 @@
+benchmark:
+  name: Federated_Learning_PFLlib
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["cifar10_fl"]
+  include_metrics: ["test_acc_mean"]
+  per_metric_direction:
+    test_acc_mean: higher
+    test_acc_std_mean: lower

@@ -1,0 +1,16 @@
+{
+  "tofu_unlearning": {
+    "means": {
+      "forget_quality_mean": 1.572462355189384e-167,
+      "model_utility_mean": 4.217986053334985e-47
+    },
+    "stderrs": {
+      "forget_quality_stderr": 0.0,
+      "model_utility_stderr": 0.0
+    },
+    "final_info_dict": {
+      "forget_quality": 1.572462355189384e-167,
+      "model_utility": 4.217986053334985e-47
+    }
+  }
+}

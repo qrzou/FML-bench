@@ -1,0 +1,9 @@
+benchmark:
+  name: Data_Efficiency_easyfsl
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["miniimagenet_test"]
+  include_metrics: ["accuracy_mean"]
+  per_metric_direction:
+    accuracy_mean: higher

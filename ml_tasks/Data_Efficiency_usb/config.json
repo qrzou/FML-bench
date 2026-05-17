@@ -1,0 +1,12 @@
+{
+    "repo_dir": "workspace/Data_Efficiency_usb/Semi-supervised-learning",
+    "pinned_commit": "1ef4cbe",
+    "conda_env": "usb",
+    "target_files": [
+        "algorithm.py"
+    ],
+    "val_command": "cp ../../../ml_tasks/Data_Efficiency_usb/train_eval_baseline.py ./ && python train_eval_baseline.py --split val",
+    "test_command": "cp ../../../ml_tasks/Data_Efficiency_usb/train_eval_baseline.py ./ && python train_eval_baseline.py --split test",
+    "metric": "test_acc_mean",
+    "metric_direction": "higher"
+}

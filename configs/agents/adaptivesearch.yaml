@@ -1,0 +1,39 @@
+# AdaptiveSearch agent configuration
+# Phase 1 = autoresearch verbatim + per-step stagnation check
+# Phase 2 = strict round-robin frontier expansion + adaptive sub-rule prompts
+# Step 1 + Step 2 thresholds locked from formal_results_analysis/adaptive_phase{1,2}/
+agent:
+  type: adaptivesearch
+  adaptivesearch:
+    # ----- inherited from autoresearch -----
+    max_debug_retries: 3
+    max_stderr_output: 1500
+    execute_timeout: 2400
+
+    # ----- Phase 1 -> 2 trigger -----
+    p1_window: 50
+    p1_epsilon: 0.0005
+
+    # ----- Phase 2 sub-rules -----
+    A_freq_window: 20
+    A_freq_max: 2
+    A_reach_norm_max: 0.30
+    B_freq_window: 5
+    B_freq_max: 2
+    B_effdim_min: 1.25
+
+    # ----- Branch allocation (remaining steps -> branch count) -----
+    # remaining <= branch_skip_max          -> stay in Phase 1
+    # remaining <= branch_cutoff_1          -> 1 branch
+    # branch_cutoff_1 < remaining <= branch_cutoff_2 -> 2 branches
+    # remaining > branch_cutoff_2           -> 3 branches
+    branch_skip_max: 3
+    branch_cutoff_1: 15
+    branch_cutoff_2: 30
+
+    # ----- Embedding (GraphCodeBERT) -----
+    # Per-task max_reach calibration is inlined in agents/adaptivesearch/agent.py
+    # (PER_TASK_MAX_REACH dict) — no external file loads at runtime.
+    graphcodebert_model: "microsoft/graphcodebert-base"
+    embed_max_tokens: 512
+    embed_device: "cuda"

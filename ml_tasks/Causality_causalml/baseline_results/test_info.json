@@ -1,0 +1,73 @@
+{
+  "ihdp_test": {
+    "means": {
+      "ate_mean": 3.9738047122955322,
+      "mae_mean": 1.328343456347623,
+      "mse_mean": 2.6607436648335425,
+      "auuc_mean": 0.5496804469003527,
+      "abs_pct_error_of_ate_mean": 0.02071267823273304
+    },
+    "stderrs": {
+      "ate_stderr": 0.0,
+      "mae_stderr": 0.0,
+      "mse_stderr": 0.0,
+      "auuc_stderr": 0.0,
+      "abs_pct_error_of_ate_stderr": 0.0
+    },
+    "final_info_dict": {
+      "ate": [
+        3.9738047122955322
+      ],
+      "mae": [
+        1.328343456347623
+      ],
+      "mse": [
+        2.6607436648335425
+      ],
+      "auuc": [
+        0.5496804469003527
+      ],
+      "abs_pct_error_of_ate": [
+        0.02071267823273304
+      ]
+    }
+  },
+  "synthetic_test": {
+    "means": {
+      "ate_mean": 0.6098108291625977,
+      "mse_mean": 0.07097001827289394,
+      "mae_mean": 0.2144561082198344,
+      "abs_pct_error_of_ate_mean": 0.19282538408685657,
+      "kl_divergence_mean": 0.8572738531124543,
+      "auuc_mean": 0.5741350523995864
+    },
+    "stderrs": {
+      "ate_stderr": 0.0,
+      "mse_stderr": 0.0,
+      "mae_stderr": 0.0,
+      "abs_pct_error_of_ate_stderr": 0.0,
+      "kl_divergence_stderr": 0.0,
+      "auuc_stderr": 0.0
+    },
+    "final_info_dict": {
+      "ate": [
+        0.6098108291625977
+      ],
+      "mse": [
+        0.07097001827289394
+      ],
+      "mae": [
+        0.2144561082198344
+      ],
+      "abs_pct_error_of_ate": [
+        0.19282538408685657
+      ],
+      "kl_divergence": [
+        0.8572738531124543
+      ],
+      "auuc": [
+        0.5741350523995864
+      ]
+    }
+  }
+}

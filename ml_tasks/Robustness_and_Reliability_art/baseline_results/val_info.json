@@ -1,0 +1,107 @@
+{
+  "poisoned_mnist": {
+    "means": {
+      "clean_acc_mean": 0.9441904761904762,
+      "poison_acc_mean": 0.6593810444874275,
+      "resist_acc_mean": 0.34061895551257254,
+      "defense_score_mean": 0.4720302724887606
+    },
+    "stderrs": {
+      "clean_acc_stderr": 0.0,
+      "poison_acc_stderr": 0.0,
+      "resist_acc_stderr": 0.0,
+      "defense_score_stderr": 0.0
+    },
+    "final_info_dict": {
+      "clean_acc": 0.9441904761904762,
+      "poison_acc": 0.6593810444874275,
+      "resist_acc": 0.34061895551257254,
+      "defense_score": 0.4720302724887606
+    },
+    "worst_case": {
+      "defense_score_min": 0.2980948132887451,
+      "clean_acc_min": 0.9385714285714286,
+      "poison_acc_max": 0.8230174081237911
+    },
+    "all_backdoor_results": {
+      "clean_acc": [
+        0.9419047619047619,
+        0.9442857142857143,
+        0.9438095238095238,
+        0.9385714285714286,
+        0.9523809523809523
+      ],
+      "poison_acc": [
+        0.6160541586073501,
+        0.8230174081237911,
+        0.7475822050290135,
+        0.29980657640232106,
+        0.8104448742746615
+      ],
+      "resist_acc": [
+        0.38394584139264987,
+        0.1769825918762089,
+        0.2524177949709865,
+        0.700193423597679,
+        0.1895551257253385
+      ],
+      "defense_score": [
+        0.5455221205494222,
+        0.2980948132887451,
+        0.3983094435854949,
+        0.8020449559831994,
+        0.3161800290369415
+      ]
+    },
+    "per_backdoor_results": [
+      {
+        "backdoor_type": "pattern",
+        "clean_acc": 0.9419047619047619,
+        "poison_acc": 0.6160541586073501,
+        "resist_acc": 0.38394584139264987,
+        "defense_score": 0.5455221205494222
+      },
+      {
+        "backdoor_type": "distributed",
+        "clean_acc": 0.9442857142857143,
+        "poison_acc": 0.8230174081237911,
+        "resist_acc": 0.1769825918762089,
+        "defense_score": 0.2980948132887451
+      },
+      {
+        "backdoor_type": "edge",
+        "clean_acc": 0.9438095238095238,
+        "poison_acc": 0.7475822050290135,
+        "resist_acc": 0.2524177949709865,
+        "defense_score": 0.3983094435854949
+      },
+      {
+        "backdoor_type": "random_corner",
+        "clean_acc": 0.9385714285714286,
+        "poison_acc": 0.29980657640232106,
+        "resist_acc": 0.700193423597679,
+        "defense_score": 0.8020449559831994
+      },
+      {
+        "backdoor_type": "pattern_topleft",
+        "clean_acc": 0.9523809523809523,
+        "poison_acc": 0.8104448742746615,
+        "resist_acc": 0.1895551257253385,
+        "defense_score": 0.3161800290369415
+      }
+    ],
+    "config": {
+      "num_backdoor_types": 5,
+      "backdoor_types": [
+        "pattern",
+        "distributed",
+        "edge",
+        "random_corner",
+        "pattern_topleft"
+      ],
+      "num_samples": 8404,
+      "poison_rate": 0.33,
+      "note": "Comprehensive evaluation with multiple diverse backdoor types"
+    }
+  }
+}

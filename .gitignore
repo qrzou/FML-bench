@@ -1,0 +1,47 @@
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Environments
+.env
+.venv
+venv/
+env/
+ENV/
+
+# Editors / OS
+.idea/
+.vscode/
+.aider*
+*.DS_Store
+
+# Type-checker / linter caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+pip-log.txt
+
+# Project-specific
+/benchmark_results/
+/logs/
+/tmp/
+/data/
+*.ckpt.pt
+*.zip
+
+# Workspace (populated by setup.py — keep README, ignore everything else)
+/workspace/*
+!/workspace/README.md

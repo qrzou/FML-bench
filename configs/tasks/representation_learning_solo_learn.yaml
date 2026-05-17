@@ -1,0 +1,9 @@
+benchmark:
+  name: Representation_Learning_solo_learn
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["cifar100_ssl"]
+  include_metrics: ["linear_eval_acc_mean"]
+  per_metric_direction:
+    linear_eval_acc_mean: higher

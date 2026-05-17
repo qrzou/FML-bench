@@ -1,0 +1,12 @@
+benchmark:
+  name: Privacy_privacymeter
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["cifar10"]
+  include_metrics: ["AUC_gap_mean"]
+  per_metric_direction:
+    AUC_gap_mean: lower
+    TPR@0.1%FPR_mean: lower
+    TPR@0.0%FPR_mean: lower
+    test_acc_mean: higher

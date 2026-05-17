@@ -1,0 +1,14 @@
+benchmark:
+  name: Causality_causalml
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["ihdp_test"]
+  include_metrics: ["mae_mean"]
+  per_metric_direction:
+    ate_mean: null
+    mae_mean: lower
+    auuc_mean: higher
+    mse_mean: lower
+    abs_pct_error_of_ate_mean: lower
+    kl_divergence_mean: lower

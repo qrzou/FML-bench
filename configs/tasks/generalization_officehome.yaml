@@ -1,0 +1,9 @@
+benchmark:
+  name: Generalization_domainbed_officehome
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["OfficeHome_test_env0"]
+  include_metrics: ["avg_acc_mean"]
+  per_metric_direction:
+    avg_acc_mean: higher

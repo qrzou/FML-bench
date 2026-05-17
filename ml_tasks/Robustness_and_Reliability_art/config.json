@@ -1,0 +1,14 @@
+{
+    "repo_dir": "workspace/Robustness_and_Reliability_art/adversarial-robustness-toolbox",
+    "pinned_commit": "527b5b6b768b2282fe30ee8785d06eafaceb1c01",
+    "conda_env": "art",
+    "target_files": [
+        "art/defences/trainer/dp_instahide_trainer.py",
+        "model.py",
+        "split_config.json"
+    ],
+    "val_command": "cp ../../../ml_tasks/Robustness_and_Reliability_art/original_file_backup/backdoor_attack.py ./art/attacks/poisoning/ && cp ../../../ml_tasks/Robustness_and_Reliability_art/original_file_backup/image_perturbations.py ./art/attacks/poisoning/perturbations/ && cp ../../../ml_tasks/Robustness_and_Reliability_art/original_file_backup/keras.py ./art/estimators/classification/ && cp ../../../ml_tasks/Robustness_and_Reliability_art/original_file_backup/utils.py ./art/ && cp ../../../ml_tasks/Robustness_and_Reliability_art/original_file_backup/mixup.py ./art/defences/preprocessor/mixup/ && cp ../../../ml_tasks/Robustness_and_Reliability_art/trainer.py ./ && cp ../../../ml_tasks/Robustness_and_Reliability_art/eval.py ./ && python eval.py --split val",
+    "test_command": "cp ../../../ml_tasks/Robustness_and_Reliability_art/original_file_backup/backdoor_attack.py ./art/attacks/poisoning/ && cp ../../../ml_tasks/Robustness_and_Reliability_art/original_file_backup/image_perturbations.py ./art/attacks/poisoning/perturbations/ && cp ../../../ml_tasks/Robustness_and_Reliability_art/original_file_backup/keras.py ./art/estimators/classification/ && cp ../../../ml_tasks/Robustness_and_Reliability_art/original_file_backup/utils.py ./art/ && cp ../../../ml_tasks/Robustness_and_Reliability_art/original_file_backup/mixup.py ./art/defences/preprocessor/mixup/ && cp ../../../ml_tasks/Robustness_and_Reliability_art/trainer.py ./ && cp ../../../ml_tasks/Robustness_and_Reliability_art/eval.py ./ && python eval.py --split test",
+    "metric": "defense_score_mean",
+    "metric_direction": "higher"
+}

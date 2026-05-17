@@ -1,0 +1,28 @@
+{
+  "adult": {
+    "means": {
+      "accuracy_mean": 0.8545123891793589,
+      "balanced_accuracy_mean": 0.7725757506092235,
+      "equalized_odds_diff_mean": 0.13020581113801455,
+      "demographic_parity_diff_mean": 0.18663158848996153,
+      "abs_equalized_odds_diff_mean": 0.13020581113801455,
+      "abs_demographic_parity_diff_mean": 0.18663158848996153
+    },
+    "stderrs": {
+      "accuracy_stderr": 0.0,
+      "balanced_accuracy_stderr": 0.0,
+      "equalized_odds_diff_stderr": 0.0,
+      "demographic_parity_diff_stderr": 0.0,
+      "abs_equalized_odds_diff_stderr": 0.0,
+      "abs_demographic_parity_diff_stderr": 0.0
+    },
+    "final_info_dict": {
+      "accuracy": 0.8545123891793589,
+      "balanced_accuracy": 0.7725757506092235,
+      "equalized_odds_diff": 0.13020581113801455,
+      "demographic_parity_diff": 0.18663158848996153,
+      "abs_equalized_odds_diff": 0.13020581113801455,
+      "abs_demographic_parity_diff": 0.18663158848996153
+    }
+  }
+}

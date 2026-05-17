@@ -1,0 +1,4 @@
+{
+    "val_ratio": 0.20,
+    "val_seed": 42
+}

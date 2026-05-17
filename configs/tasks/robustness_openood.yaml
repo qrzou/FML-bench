@@ -1,0 +1,10 @@
+benchmark:
+  name: Robustness_openood
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["openood"]
+  include_metrics: ["auroc_mean"]
+  per_metric_direction:
+    auroc_mean: higher
+    fpr95_mean: lower

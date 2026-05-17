@@ -1,0 +1,9 @@
+benchmark:
+  name: Data_Efficiency_usb
+
+metrics:
+  optimization_direction: null
+  include_datasets: ["cifar100_ssl"]
+  include_metrics: ["test_acc_mean"]
+  per_metric_direction:
+    test_acc_mean: higher

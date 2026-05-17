@@ -1,0 +1,33 @@
+{
+  "cifar10": {
+    "means": {
+      "AUC_gap_mean": 0.32310000000000005,
+      "TPR@0.1%FPR_mean": 0.0,
+      "TPR@0.0%FPR_mean": 0.0,
+      "test_acc_mean": 0.61298
+    },
+    "stderrs": {
+      "AUC_gap_stderr": 0.0,
+      "TPR@0.1%FPR_stderr": 0.0,
+      "TPR@0.0%FPR_stderr": 0.0,
+      "test_acc_stderr": 0.0
+    },
+    "final_info_dict": {
+      "AUC_gap": [
+        0.32310000000000005
+      ],
+      "TPR@0.1%FPR": [
+        0.0
+      ],
+      "TPR@0.0%FPR": [
+        0.0
+      ],
+      "test_acc": [
+        0.6248,
+        0.59288,
+        0.61136,
+        0.62288
+      ]
+    }
+  }
+}

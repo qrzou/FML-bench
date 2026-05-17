@@ -1,0 +1,15 @@
+{
+  "OfficeHome_test_env0": {
+    "means": {
+      "avg_acc_mean": 0.8339160997873734
+    },
+    "stderrs": {
+      "avg_acc_stderr": 0.0
+    },
+    "final_info_dict": {
+      "avg_acc": [
+        0.8339160997873734
+      ]
+    }
+  }
+}

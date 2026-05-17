@@ -1,0 +1,13 @@
+{
+    "repo_dir": "workspace/Privacy_opacus/opacus",
+    "pinned_commit": "6dc0a27",
+    "conda_env": "opacus",
+    "target_files": [
+        "algorithm.py",
+        "split_config.json"
+    ],
+    "val_command": "cp ../../../ml_tasks/Privacy_opacus/train_eval_baseline.py ./ && mv opacus opacus_src 2>/dev/null; python train_eval_baseline.py --split val; mv opacus_src opacus 2>/dev/null; true",
+    "test_command": "cp ../../../ml_tasks/Privacy_opacus/train_eval_baseline.py ./ && mv opacus opacus_src 2>/dev/null; python train_eval_baseline.py --split test; mv opacus_src opacus 2>/dev/null; true",
+    "metric": "test_acc_mean",
+    "metric_direction": "higher"
+}
