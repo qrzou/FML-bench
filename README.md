@@ -10,7 +10,7 @@
     </a>
 </p>
 
-> **Note:** Paper link coming soon. The previous version ([arxiv:2510.10472](https://arxiv.org/abs/2510.10472)) lives on the [`legacy`](https://github.com/qrzou/FML-bench/tree/legacy) branch.
+> **Note:** Paper link [arxiv:2605.17373](https://arxiv.org/abs/2605.17373). The previous version ([arxiv:2510.10472](https://arxiv.org/abs/2510.10472)) lives on the [`legacy`](https://github.com/qrzou/FML-bench/tree/legacy) branch.
 
 A benchmark for automatic ML research agents on fundamental machine learning
 problems. Agents are given a baseline codebase, evaluation harness, and task
