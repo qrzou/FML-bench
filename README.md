@@ -28,6 +28,7 @@ description, and are asked to iteratively improve the baseline.
 - [Run an agent (example)](#run-an-agent-example)
 - [Run with other models](#run-with-other-models)
 - [Run on other tasks](#run-on-other-tasks)
+- [Score a run](#score-a-run)
 - [Available agents](#available-agents)
 - [Repository layout](#repository-layout)
 - [Citation](#citation)
@@ -42,7 +43,7 @@ Install everything (task repos, datasets, conda envs):
 python setup.py
 ```
 
-Run an agent (e.g. AI Scientist v2 on Causality_causalml with GPT-5):
+Run an agent (e.g. AI Scientist v2 on Causality_causalml with GPT-5.4):
 
 ```bash
 conda activate fmlbench
@@ -50,7 +51,7 @@ export OPENAI_API_KEY="your_openai_api_key"
 python run_agent_benchmark.py \
     --agent-config configs/agents/ai_scientist_v2.yaml \
     --task-config  configs/tasks/causality_causalml.yaml \
-    --model gpt-5 --provider OpenAI \
+    --model gpt-5.4 --provider OpenAI \
     --output-dir results \
     agent.ai_scientist_v2.max_steps=100
 ```
@@ -95,7 +96,7 @@ baseline code.
 ## Run an agent (example)
 
 This example runs **AI Scientist v2** on **Causality_causalml** using
-**GPT-5**.
+**GPT-5.4**.
 
 ```bash
 # 1. set up just this task
@@ -114,7 +115,7 @@ export CUDA_VISIBLE_DEVICES=0
 python run_agent_benchmark.py \
     --agent-config configs/agents/ai_scientist_v2.yaml \
     --task-config  configs/tasks/causality_causalml.yaml \
-    --model        gpt-5 \
+    --model        gpt-5.4 \
     --provider     OpenAI \
     --output-dir   results \
     agent.ai_scientist_v2.max_steps=100
@@ -166,7 +167,7 @@ arguments, e.g.:
 python run_agent_benchmark.py \
     --agent-config configs/agents/ai_scientist_v2.yaml \
     --task-config  configs/tasks/causality_causalml.yaml \
-    --model gpt-5 --provider OpenAI \
+    --model gpt-5.4 --provider OpenAI \
     --output-dir results \
     agent.ai_scientist_v2.max_steps=100 \
     agent.ai_scientist_v2.num_ideas=5 \
@@ -185,7 +186,7 @@ python setup.py --task Generalization_domainbed
 python run_agent_benchmark.py \
     --agent-config configs/agents/ai_scientist_v2.yaml \
     --task-config  configs/tasks/generalization.yaml \
-    --model gpt-5 --provider OpenAI \
+    --model gpt-5.4 --provider OpenAI \
     --output-dir results \
     agent.ai_scientist_v2.max_steps=100
 ```
@@ -216,6 +217,34 @@ Available task configs (one per task):
 `python setup.py --list` prints the task names accepted by `--task`.
 
 
+## Score a run
+
+After an agent has run on all 18 tasks under a single `--output-dir`, score it
+with `compute_agent_metrics.py`. Point the script at that agent's result
+directory — `<output-dir>/<agent_name>`, which holds one subdirectory per task:
+
+```bash
+conda activate fmlbench
+python compute_agent_metrics.py results/ai_scientist_v2
+```
+
+It prints and writes three tables (as CSVs under `metric_reports/<agent_name>/`
+by default; override the location with `--output-dir`):
+
+1. **Raw Performance** — the canonical test metric for each task.
+2. **Normalized Improvement** — each task's improvement over its baseline,
+   normalized to `[0, 1]` and averaged across tasks.
+3. **Process-Level metrics** — 12 metrics spanning Exploration, Generalization,
+   Reliability, Efficiency, and Cost.
+
+The 4 Exploration metrics embed each step's code snapshot with GraphCodeBERT and
+additionally require `torch`, `transformers`, and `scikit-learn` (embeddings are
+cached under the output dir). They read each task's baseline code from
+`workspace/`, so that workspace must be at its reset (baseline) state when
+scoring. The script only reads from the result directory and refuses an
+`--output-dir` that is, or is nested inside, the result directory.
+
+
 ## Available agents
 
 Seven agents are registered in this benchmark. Each has a config in
@@ -240,6 +269,7 @@ provider) stays the same.
 ```
 setup.py                  # one-shot environment + workspace setup
 run_agent_benchmark.py    # entry point for running an agent on a task
+compute_agent_metrics.py  # score one agent's results (3 tables + CSVs)
 agents/                   # agent implementations
 benchmark/                # benchmark runner / executor
 configs/agents/           # agent YAMLs
@@ -251,7 +281,16 @@ workspace/                # populated by setup.py with task codebases
 
 ## Citation
 
-Citation: coming soon.
+If you find FML-bench useful in your research, please cite our paper:
+
+```bibtex
+@article{zou2026fml,
+  title={FML-bench: A Controlled Study of AI Research Agent Strategies from the Perspective of Search Dynamics},
+  author={Zou, Qiran and Lam, Hou Hei and Zhao, Wenhao and Chen, Tingting and Tang, Yiming and Yu, Samson and Zhu, Yingtao and Anumasa, Srinivas and Zhang, Zufeng and Zhang, Tianyi and others},
+  journal={arXiv preprint arXiv:2605.17373},
+  year={2026}
+}
+```
 
 
 ## Acknowledgements
