@@ -97,7 +97,7 @@ class BenchmarkExecutor:
         Steps:
             1. Clean results_tmp/ in repo_dir if it exists
             2. Create run_{run_id}/execution_{timestamp}/ directories
-            3. Backup modified files
+            3. Backup modified files (only when config['save_code_backup'] is set)
             4. Run val_command via _run_command()
             5. Collect results from results_tmp/val_info.json
             6. Extract primary_metric
@@ -162,8 +162,14 @@ class BenchmarkExecutor:
             shutil.rmtree(execution_dir)
         os.makedirs(execution_dir, exist_ok=True)
 
-        # 3. Backup modified files (val only)
-        if backup:
+        # 3. Backup modified files (val only, and only when explicitly enabled).
+        # code_backup/ is a snapshot of ALL git-changed files, dominated in size by
+        # regenerable artifacts (checkpoints, dataset caches, ROC plots) that nothing
+        # in scoring/analysis reads; off by default to keep result dirs small. The
+        # agent's code edits are already preserved in step_snapshots/, and the final
+        # test regenerates checkpoints via pre_test_val, so skipping the backup never
+        # affects execution.
+        if backup and self.config.get("save_code_backup", False):
             self._backup_files(run_id, execution_timestamp)
 
         # 3.5 Run preprocess commands if old-format config has them

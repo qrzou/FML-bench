@@ -49,6 +49,14 @@ Examples:
                         help="Optional label for workspace copy. A unique ID is always appended.")
     parser.add_argument("--output-dir", type=str, default="benchmark_results",
                         help="Root directory for experiment outputs (default: benchmark_results)")
+    parser.add_argument("--save-code-backup", action="store_true", default=False,
+                        help="Back up all git-changed files in the task repo into "
+                             "execution_<ts>/code_backup/ before each validation run. "
+                             "Off by default: code_backup/ is dominated by large "
+                             "regenerable artifacts (checkpoints, dataset caches, ROC "
+                             "plots) that scoring/analysis never reads; the agent's code "
+                             "edits are already kept in step_snapshots/. Enable to "
+                             "retain the full per-step workspace snapshot for debugging.")
     parser.add_argument("overrides", nargs="*",
                         help="Config overrides in format: key=value (e.g., agent.aide.num_drafts=3)")
     return parser.parse_args()
@@ -185,6 +193,7 @@ def save_results(result, config: Dict[str, Any], runner: BenchmarkRunner):
             "val_steps": [asdict(s) for s in result.all_steps],
             "token_usage": result.token_usage,
             "parent_workspace": result.parent_workspace,
+            "save_code_backup": runner.save_code_backup,
             "metadata": result.metadata,
         }
         save_path = os.path.join(result.parent_workspace, "summary.json")
@@ -307,7 +316,8 @@ def main():
     print(f"Model: {agent_config.model} (Provider: {agent_config.provider})")
 
     runner = BenchmarkRunner(benchmark_name, agent, workspace_label=args.workspace_label,
-                              output_dir=args.output_dir)
+                              output_dir=args.output_dir,
+                              save_code_backup=args.save_code_backup)
 
     # Register signal handlers to kill experiment subprocesses on external kill
     def _cleanup_on_signal(signum, frame):

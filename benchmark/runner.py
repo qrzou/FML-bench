@@ -33,12 +33,13 @@ class BenchmarkRunner:
     """
 
     def __init__(self, benchmark_name: str, agent: BaseAgent, workspace_label: str = None,
-                 output_dir: str = "benchmark_results"):
+                 output_dir: str = "benchmark_results", save_code_backup: bool = False):
         self.benchmark_name = benchmark_name
         self.agent = agent
         self.agent_name = agent.config.agent_type.value
         self.workspace_label = workspace_label
         self.output_dir = output_dir
+        self.save_code_backup = save_code_backup
         self._workspace_copy_path = None
         self.config = self._load_config()
         self._setup_workspace(workspace_label)
@@ -62,6 +63,10 @@ class BenchmarkRunner:
             metrics_cfg = self.agent.config.runtime_params.get("metrics", {})
             if metrics_cfg.get("include_datasets"):
                 self.config["include_datasets"] = metrics_cfg["include_datasets"]
+
+            # 2b. Propagate the code-backup toggle into benchmark_config so the
+            # executor (constructed by every agent from benchmark_config) can read it.
+            self.config["save_code_backup"] = self.save_code_backup
 
             # 3. Inject runtime params into agent config
             self.agent.config.runtime_params.update({
