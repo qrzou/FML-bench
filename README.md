@@ -28,6 +28,7 @@ description, and are asked to iteratively improve the baseline.
 - [Run an agent (example)](#run-an-agent-example)
 - [Run with other models](#run-with-other-models)
 - [Run on other tasks](#run-on-other-tasks)
+- [Run on remote GPUs (Modal)](#run-on-remote-gpus-modal)
 - [Score a run](#score-a-run)
 - [Available agents](#available-agents)
 - [Repository layout](#repository-layout)
@@ -215,6 +216,79 @@ Available task configs (one per task):
 | Unlearning (open-unlearning)             | `configs/tasks/unlearning_open_unlearning.yaml`         |
 
 `python setup.py --list` prints the task names accepted by `--task`.
+
+
+## Run on remote GPUs (Modal)
+
+By default every evaluation runs as a local subprocess on this machine
+(`--eval-backend local`, the default). FML-bench can optionally offload **only
+the experiment-execution step** — each task's validation/test command — to an
+ephemeral [Modal](https://modal.com) GPU sandbox, while the entire agent loop
+(search, code edits, metric parsing) keeps running locally. This lets you run on
+remote GPUs and fan many tasks out in parallel without changing any agent or
+task behavior.
+
+> The local default is untouched by this backend: `modal` is never imported
+> unless you pass `--eval-backend modal`, so the standard workflow above behaves
+> exactly as before. The Modal backend is opt-in and still being hardened — see
+> [`docs/MODAL.md`](docs/MODAL.md) for what is and isn't verified.
+
+**One-time setup** (only for the Modal backend):
+
+```bash
+pip install modal          # into the env that runs the orchestrator
+modal token new            # authenticate; writes ~/.modal.toml
+```
+
+**Build the remote image for a task** — reproduces that task's conda env and
+data on Modal, once per task:
+
+```bash
+modal run modal_app/provision.py::build --task Causality_causalml
+```
+
+**Run a single task on Modal** — the command is identical to the local one;
+only the backend flag changes:
+
+```bash
+python run_agent_benchmark.py \
+    --agent-config configs/agents/ai_scientist_v2.yaml \
+    --task-config  configs/tasks/causality_causalml.yaml \
+    --model gpt-5.4 --provider OpenAI \
+    --output-dir results \
+    --eval-backend modal \
+    agent.ai_scientist_v2.max_steps=100
+# equivalent: FMLBENCH_EVAL_BACKEND=modal python run_agent_benchmark.py ...
+```
+
+**Run many tasks in parallel** with the task-level launcher. It spawns one local
+driver per task — each running the unmodified `run_agent_benchmark.py
+--eval-backend modal` — and Modal schedules the GPU sandboxes concurrently:
+
+```bash
+python launch_benchmark.py \
+    --agent-config configs/agents/ai_scientist_v2.yaml \
+    --tasks all \
+    --model gpt-5.4 --provider OpenAI \
+    --output-dir benchmark_results \
+    --max-concurrency 16
+```
+
+`--tasks` takes `all` or a comma-separated list (`--list-tasks` prints the
+choices); `--max-concurrency` bounds the peak number of concurrent GPU sandboxes,
+so keep it under your Modal account's quota. Sandboxes are ephemeral and torn
+down after each eval; if a hard crash leaks one, reclaim it with the reaper
+(dry-run by default):
+
+```bash
+modal run modal_app/provision.py::reap --max-age-seconds 7200            # dry-run
+modal run modal_app/provision.py::reap --max-age-seconds 7200 --force    # terminate
+```
+
+See **[`docs/MODAL.md`](docs/MODAL.md)** for the full operator runbook (per-task
+provisioning, fidelity gates, mid-eval reconnect/recovery, and verification
+status) and **[`docs/MODAL_DESIGN.md`](docs/MODAL_DESIGN.md)** for the design and
+rationale.
 
 
 ## Score a run
