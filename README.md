@@ -28,6 +28,8 @@ description, and are asked to iteratively improve the baseline.
 - [Run an agent (example)](#run-an-agent-example)
 - [Run with other models](#run-with-other-models)
 - [Run on other tasks](#run-on-other-tasks)
+- [FML-bench-Lite (10-task split)](#fml-bench-lite-10-task-split)
+- [Remote GPU execution (Modal)](#remote-gpu-execution-modal)
 - [Score a run](#score-a-run)
 - [Available agents](#available-agents)
 - [Repository layout](#repository-layout)
@@ -215,6 +217,52 @@ Available task configs (one per task):
 | Unlearning (open-unlearning)             | `configs/tasks/unlearning_open_unlearning.yaml`         |
 
 `python setup.py --list` prints the task names accepted by `--task`.
+
+
+## FML-bench-Lite (10-task split)
+
+**FML-bench-Lite** is a **10-task** subset of the full benchmark, split into two
+5-task groups, **Sparse Opp 5** and **Dense Opp 5**.
+
+**Sparse Opp 5**
+
+| Task                                     | Config file                                    |
+|------------------------------------------|------------------------------------------------|
+| Continual Learning (PyCIL)               | `configs/tasks/continual_learning_pycil.yaml`  |
+| Data Efficiency (USB)                    | `configs/tasks/data_efficiency_usb.yaml`       |
+| Generalization (DomainBed, ColoredMNIST) | `configs/tasks/generalization.yaml`            |
+| Generalization (DomainBed, OfficeHome)   | `configs/tasks/generalization_officehome.yaml` |
+| Robustness (OpenOOD)                     | `configs/tasks/robustness_openood.yaml`        |
+
+**Dense Opp 5**
+
+| Task                                     | Config file                                         |
+|------------------------------------------|-----------------------------------------------------|
+| Continual Learning (continual-learning)  | `configs/tasks/continual_learning.yaml`             |
+| Privacy (Opacus)                         | `configs/tasks/privacy_opacus.yaml`                 |
+| Privacy (PrivacyMeter)                   | `configs/tasks/privacy_privacymeter.yaml`           |
+| Robustness (ART)                         | `configs/tasks/robustness_and_reliability_art.yaml` |
+| Unlearning (open-unlearning)             | `configs/tasks/unlearning_open_unlearning.yaml`     |
+
+Run an agent on these 10 task configs and [score](#score-a-run) it exactly as
+you would the full suite. On this subset the overall ranking of agents broadly
+tracks what the full 18-task benchmark shows — not identical task-for-task, but
+consistent enough to make Lite a useful, cheaper proxy when a full sweep is out
+of reach.
+
+
+## Remote GPU execution (Modal)
+
+By default evaluations run as local subprocesses on this machine. FML-bench also
+supports an **opt-in [Modal](https://modal.com) backend** that offloads only the
+experiment-execution step (each task's validation/test command) to an ephemeral
+remote GPU sandbox, while the entire agent loop — search, code edits, metric
+parsing — stays local. This lets you run on remote GPUs and fan many tasks out
+in parallel, with no change to agent or task behavior.
+
+That backend lives on its own branch and does not affect the local default on
+this branch. For setup and usage, see the
+[`Modal` branch](https://github.com/qrzou/FML-bench/tree/Modal).
 
 
 ## Score a run
