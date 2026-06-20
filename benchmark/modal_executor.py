@@ -66,6 +66,7 @@ class ModalExecutor(BenchmarkExecutor):
         # `cp ../../../ml_tasks/<task>/...` paths in val_command — match local.
         self._remote_repo_dir = self._derive_remote_repo_dir()
         self._sb = None              # the live Modal sandbox handle (or None)
+        self._app = None             # cached running App handle (modal.App.lookup)
         self._tree_hash_checked = False
         # SIGINT backstop: shared handler calls sys.exit -> atexit runs this.
         atexit.register(self._atexit_terminate)
@@ -494,12 +495,29 @@ class ModalExecutor(BenchmarkExecutor):
 
     # ==================================================================
     # Thin Modal SDK adapter — the ONLY place that touches the Modal SDK.
-    # Every method here is marked # VERIFY (no Modal account to live-verify).
+    # Each call is marked # VERIFY; the App.lookup -> Sandbox.create -> exec ->
+    # wait -> set_tags -> terminate path was live-confirmed on modal 1.5.0.
     # ==================================================================
+
+    def _running_app(self):
+        """A *running* App handle for ephemeral Sandbox.create from a plain process.
+
+        A bare ``modal.App(name)`` (modal_app.app) is uninitialized and usable only
+        under ``modal run`` / ``app.run()``; ``Sandbox.create`` from this plain
+        orchestrator process rejects it ("App has not been initialized"), so we
+        resolve a running handle by name (creating it if missing) and cache it.
+        """
+        if self._app is None:
+            import modal
+            from modal_app import APP_NAME
+            # VERIFY (App.lookup create_if_missing; live-confirmed on modal 1.5.0)
+            self._app = modal.App.lookup(APP_NAME, create_if_missing=True)
+        return self._app
 
     def _sb_create(self):
         """Create an ephemeral GPU sandbox from the task's baked image."""
-        from modal_app import SANDBOX_TAG, app, task_gpu, task_image, task_volumes
+        from modal_app import SANDBOX_TAG, task_gpu, task_image, task_volumes
+        app = self._running_app()
         image = task_image(self.task)
         gpu = task_gpu(self.task)
         volumes = task_volumes(self.task)

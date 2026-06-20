@@ -75,6 +75,12 @@ class TestModalSDKContract(unittest.TestCase):
         app = self.modal.App("fml-bench-eval-contract-test")
         self.assertIsInstance(app, self.modal.App)
 
+    def test_app_lookup_accepts_create_if_missing(self):
+        # ModalExecutor._running_app() resolves a RUNNING app via
+        # App.lookup(APP_NAME, create_if_missing=True) — a bare App() is
+        # uninitialized and Sandbox.create rejects it (live-caught in the smoke).
+        _accepts(self, self.modal.App.lookup, ["create_if_missing"])
+
     def test_sandbox_has_methods_we_call(self):
         Sandbox = self.modal.Sandbox
         for name in ("create", "exec", "open", "set_tags", "get_tags",
@@ -128,6 +134,7 @@ class TestModalAppRealValues(unittest.TestCase):
         self.assertEqual(self.modal_app.REMOTE_ROOT, EXPECT_REMOTE_ROOT)
         self.assertEqual(self.modal_app.MANIFEST_DIR, EXPECT_MANIFEST_DIR)
         self.assertEqual(self.modal_app.SANDBOX_TAG, {"fml_bench": "fml-bench-eval"})
+        self.assertEqual(self.modal_app.APP_NAME, "fml-bench-eval")
 
     def test_app_is_modal_app_instance(self):
         self.assertIsInstance(self.modal_app.app, self.modal.App)
@@ -139,11 +146,11 @@ class TestModalAppRealValues(unittest.TestCase):
         from modal_app import gpu_map
         self.assertEqual(gpu_map.DEFAULT_GPU, EXPECT_DEFAULT_GPU)
         # Unlisted GPU task -> A100 default.
-        self.assertEqual(self.modal_app.task_gpu("Causality_causalml"), "A100")
         self.assertEqual(self.modal_app.task_gpu("Unlearning_open_unlearning"), "A100")
-        # The two CPU-only tasks -> no GPU requested.
+        # CPU-only tasks -> no GPU requested (causalml is CPU-only by project choice).
         self.assertIsNone(self.modal_app.task_gpu("Fairness_fairlearn"))
         self.assertIsNone(self.modal_app.task_gpu("Causality_gcastle"))
+        self.assertIsNone(self.modal_app.task_gpu("Causality_causalml"))
 
 
 @unittest.skipUnless(HAVE_MODAL, _SKIP)

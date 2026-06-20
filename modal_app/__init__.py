@@ -25,8 +25,14 @@ import modal  # noqa: F401  # VERIFY (Modal SDK; absent locally, present on Moda
 from modal_app.gpu_map import task_gpu
 from modal_app.images import MANIFEST_DIR, REMOTE_ROOT, task_image
 
-# Single application object that owns all sandboxes for the eval backend.
-app = modal.App("fml-bench-eval")  # VERIFY (App constructor)
+# Name of the Modal App that owns all eval sandboxes.
+APP_NAME = "fml-bench-eval"
+# App object for the `modal run` entrypoints in provision.py: under `modal run`
+# the CLI initializes this App. ModalExecutor runs in a PLAIN process (NOT
+# `modal run`), where a bare App() is uninitialized and Sandbox.create rejects it
+# ("App has not been initialized"); it instead resolves a RUNNING handle via
+# modal.App.lookup(APP_NAME, create_if_missing=True). (Live-confirmed, modal 1.5.0.)
+app = modal.App(APP_NAME)  # VERIFY (App constructor)
 
 # Tag stamped on every sandbox at creation so the reaper (provision.py::reap)
 # can find ONLY this backend's orphans and never mass-terminate unrelated
@@ -46,6 +52,7 @@ def task_volumes(task: str) -> dict:
 
 __all__ = [
     "app",
+    "APP_NAME",
     "SANDBOX_TAG",
     "REMOTE_ROOT",
     "MANIFEST_DIR",

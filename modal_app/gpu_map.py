@@ -30,6 +30,7 @@ DEFAULT_GPU = "A100"  # VERIFY (Modal GPU label)
 TASK_GPU = {
     "Fairness_fairlearn": None,   # sklearn-only env -> no GPU requested
     "Causality_gcastle":  None,   # cpu-only torch env -> no GPU requested
+    "Causality_causalml": None,   # TF task, CPU-only by project choice (small IHDP) -> no GPU
 }
 
 

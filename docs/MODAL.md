@@ -265,11 +265,14 @@ fidelity gate with a mismatched tree.
 
 ---
 
-## 5. FIDELITY GATE — Modal vs local byte-diff (pilot A: causalml, GPU sandbox)
+## 5. FIDELITY GATE — Modal vs local byte-diff (pilot A: causalml)
 
 This is the hard check that the Modal path is faithful (R2). causalml uses TensorFlow and
-grabs a GPU if one is visible, so run the Modal eval on a **GPU sandbox** to exercise
-device-selection scrubbing.
+grabs a GPU if one is visible. NOTE: `modal_app/gpu_map.py` now maps `Causality_causalml ->
+None` (CPU-only by project choice), so by default this eval runs on a **CPU sandbox** — which
+verifies the full push/exec/pull pipeline but NOT GPU device-selection scrubbing. To exercise
+the GPU-parity check, temporarily map `Causality_causalml` to a GPU (e.g. `"A100"`) in
+`gpu_map.py` and run both the local and Modal sides on a GPU, or use another GPU-mapped task.
 
 **Local reference run** (full local setup first: `python setup.py --task Causality_causalml`):
 
