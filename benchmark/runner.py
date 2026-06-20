@@ -33,13 +33,15 @@ class BenchmarkRunner:
     """
 
     def __init__(self, benchmark_name: str, agent: BaseAgent, workspace_label: str = None,
-                 output_dir: str = "benchmark_results", save_code_backup: bool = False):
+                 output_dir: str = "benchmark_results", save_code_backup: bool = False,
+                 eval_backend: str = "local"):
         self.benchmark_name = benchmark_name
         self.agent = agent
         self.agent_name = agent.config.agent_type.value
         self.workspace_label = workspace_label
         self.output_dir = output_dir
         self.save_code_backup = save_code_backup
+        self.eval_backend = eval_backend
         self._workspace_copy_path = None
         self.config = self._load_config()
         self._setup_workspace(workspace_label)
@@ -78,6 +80,7 @@ class BenchmarkRunner:
                 "task_description": self.task_description,
                 "workspace_label": self.workspace_label,
                 "output_dir": self.output_dir,
+                "eval_backend": self.eval_backend,
             })
 
             # 3. Run agent (with wall-clock timing)

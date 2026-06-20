@@ -13,7 +13,7 @@ from typing import Dict, Any, List, Optional, Tuple
 
 from ..base import BaseAgent, AgentConfig, AgentResult, StepResult
 from ..code_editor import CodeEditor
-from benchmark.executor import BenchmarkExecutor
+from benchmark.executor_factory import make_executor
 from benchmark.utils import extract_primary_metric, get_filtered_results_for_prompt
 
 
@@ -302,7 +302,8 @@ class AIRAMCTSAgent(BaseAgent):
         timeout = self.config.agent_params.get("execute_timeout", 2400)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         experiment_name = f"{timestamp}_mcts_search"
-        self.executor = BenchmarkExecutor(
+        eval_backend = self.config.runtime_params.get("eval_backend", "local")
+        self.executor = make_executor(
             self.benchmark_config,
             self.agent_name,
             self.benchmark_name,
@@ -310,6 +311,7 @@ class AIRAMCTSAgent(BaseAgent):
             parent_timestamp=self.experiment_timestamp,
             timeout=timeout,
             output_dir=self._output_dir,
+            eval_backend=eval_backend,
         )
         self.executor.setup_workspace()
 
@@ -372,7 +374,8 @@ class AIRAMCTSAgent(BaseAgent):
                 self.executor.cleanup()
             # Create a fresh executor for the test phase
             test_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.executor = BenchmarkExecutor(
+            eval_backend = self.config.runtime_params.get("eval_backend", "local")
+            self.executor = make_executor(
                 self.benchmark_config,
                 self.agent_name,
                 self.benchmark_name,
@@ -380,6 +383,7 @@ class AIRAMCTSAgent(BaseAgent):
                 parent_timestamp=self.experiment_timestamp,
                 timeout=timeout,
                 output_dir=self._output_dir,
+                eval_backend=eval_backend,
             )
             self.executor.setup_workspace()
             test_result = self._execute_test()

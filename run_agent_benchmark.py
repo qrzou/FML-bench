@@ -57,6 +57,11 @@ Examples:
                              "plots) that scoring/analysis never reads; the agent's code "
                              "edits are already kept in step_snapshots/. Enable to "
                              "retain the full per-step workspace snapshot for debugging.")
+    parser.add_argument("--eval-backend", choices=["local", "modal"], default=None,
+                        help="Backend for running validation/test evaluations. "
+                             "'local' (default) runs subprocesses on this machine; "
+                             "'modal' offloads execution to Modal. Falls back to the "
+                             "FMLBENCH_EVAL_BACKEND env var, then 'local'.")
     parser.add_argument("overrides", nargs="*",
                         help="Config overrides in format: key=value (e.g., agent.aide.num_drafts=3)")
     return parser.parse_args()
@@ -308,6 +313,8 @@ def main():
             sys.exit(1)
         raise
 
+    eval_backend = args.eval_backend or os.environ.get("FMLBENCH_EVAL_BACKEND", "local")
+
     print(f"Initializing {agent_type_str} agent...")
     agent.initialize()
 
@@ -317,7 +324,8 @@ def main():
 
     runner = BenchmarkRunner(benchmark_name, agent, workspace_label=args.workspace_label,
                               output_dir=args.output_dir,
-                              save_code_backup=args.save_code_backup)
+                              save_code_backup=args.save_code_backup,
+                              eval_backend=eval_backend)
 
     # Register signal handlers to kill experiment subprocesses on external kill
     def _cleanup_on_signal(signum, frame):

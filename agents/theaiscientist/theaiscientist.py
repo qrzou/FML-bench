@@ -13,7 +13,7 @@ from typing import List, Optional, Tuple, Dict, Any
 
 from .generate_ideas import generate_ideas
 from ..llm import create_client
-from benchmark.executor import BenchmarkExecutor
+from benchmark.executor_factory import make_executor
 from benchmark.utils import extract_primary_metric, get_filtered_results_for_prompt
 
 from ..base import BaseAgent, AgentConfig, AgentType, AgentResult, StepResult
@@ -263,7 +263,8 @@ class TheAIScientistAgent(BaseAgent):
 
             # Create executor for this idea
             timeout = self.config.agent_params.get("execute_timeout", 2400)
-            self.executor = BenchmarkExecutor(
+            eval_backend = self.config.runtime_params.get("eval_backend", "local")
+            self.executor = make_executor(
                 self.benchmark_config,
                 self.agent_name,
                 self.benchmark_name,
@@ -271,6 +272,7 @@ class TheAIScientistAgent(BaseAgent):
                 parent_timestamp=self.experiment_timestamp,
                 timeout=timeout,
                 output_dir=self._output_dir,
+                eval_backend=eval_backend,
             )
 
             # Setup workspace for this idea
@@ -333,7 +335,8 @@ class TheAIScientistAgent(BaseAgent):
         # We need an executor to run the test
         try:
             timeout = self.config.agent_params.get("execute_timeout", 2400)
-            self.executor = BenchmarkExecutor(
+            eval_backend = self.config.runtime_params.get("eval_backend", "local")
+            self.executor = make_executor(
                 self.benchmark_config,
                 self.agent_name,
                 self.benchmark_name,
@@ -341,6 +344,7 @@ class TheAIScientistAgent(BaseAgent):
                 parent_timestamp=self.experiment_timestamp,
                 timeout=timeout,
                 output_dir=self._output_dir,
+                eval_backend=eval_backend,
             )
             self.executor.setup_workspace()
 
