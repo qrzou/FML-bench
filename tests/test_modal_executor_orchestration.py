@@ -61,18 +61,19 @@ class _Readable:
 
 
 class FakeProc:
-    """Stand-in for a Modal remote process handle (already run to completion)."""
+    """Stand-in for a Modal remote process handle (already run to completion).
+
+    Mirrors the live modal 1.5 ContainerProcess contract: wait()/returncode/
+    stdout/stderr and NO per-process terminate/kill (kill_running_process tears
+    the whole sandbox down instead).
+    """
     def __init__(self, returncode, stdout, stderr):
         self.returncode = returncode
         self.stdout = _Readable(stdout)
         self.stderr = _Readable(stderr)
-        self.terminated = False
 
     def wait(self):
         return self.returncode
-
-    def terminate(self):
-        self.terminated = True
 
 
 class FakeSandbox:
@@ -86,6 +87,7 @@ class FakeSandbox:
         self.remote_root = remote_root      # e.g. "/root/fml-bench"
         self.local_root = local_root        # temp dir standing in for it
         self.record = record
+        self.object_id = "sb-fake"          # modal Sandbox.object_id (reconnect id)
 
     def _map(self, s):
         if isinstance(s, str) and self.remote_root in s:
@@ -223,15 +225,24 @@ class _ModalExecutorTestBase(unittest.TestCase):
             json.dump({"task": self.TASK, "repo_dir": self.remote_repo,
                        "tree_hash": tree_hash}, f)
 
-    def _make_executor(self, **config_overrides):
+    def _make_executor(self, create_transient_failures=0, **config_overrides):
         import benchmark.modal_executor as me
 
         record = self.record
         remote_root_local = self.remote_root_local
+        fail_budget = {"n": int(create_transient_failures)}
 
         class FakeModalExecutor(me.ModalExecutor):
+            # tiny backoff / poll so transient-retry tests never actually sleep
+            _RETRY_BACKOFF_START = 0.001
+            _RETRY_BACKOFF_CAP = 0.001
+            _RECONNECT_POLL_INTERVAL = 0.001
+
             def _sb_create(self_inner):
                 record["create"] += 1
+                if fail_budget["n"] > 0:
+                    fail_budget["n"] -= 1
+                    raise ConnectionError("Could not connect to the Modal server.")
                 sb = FakeSandbox(STUB_REMOTE_ROOT, remote_root_local, record)
                 # mirror the real _sb_create's tag stamp so it is exercised
                 sb.set_tags({"fml_bench": "fml-bench-eval", "task": self_inner.task})
@@ -470,6 +481,272 @@ class TestLocalProcessingParity(_ModalExecutorTestBase):
         self.assertEqual(modal_ex._extract_primary_metric(nested),
                          plain._extract_primary_metric(nested))
         self.assertEqual(modal_ex._extract_primary_metric(nested), 0.5)
+
+
+class TestTransientRetry(_ModalExecutorTestBase):
+    """(a) Idempotent ops retry transient Modal connection errors; deterministic
+    errors fail fast; the budget bounds the retrying."""
+
+    def test_retry_succeeds_after_transient_errors(self):
+        ex = self._make_executor()
+        ex._retry_budget_s = 5.0
+        calls = {"n": 0}
+
+        def fn():
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise ConnectionError("Could not connect to the Modal server.")
+            return "ok"
+
+        self.assertEqual(ex._with_modal_retry("probe", fn), "ok")
+        self.assertEqual(calls["n"], 3)  # 2 transient failures, then success
+
+    def test_non_transient_error_fails_fast_no_retry(self):
+        ex = self._make_executor()
+        ex._retry_budget_s = 5.0
+        calls = {"n": 0}
+
+        def fn():
+            calls["n"] += 1
+            raise RuntimeError("deterministic failure")
+
+        with self.assertRaises(RuntimeError):
+            ex._with_modal_retry("probe", fn)
+        self.assertEqual(calls["n"], 1)  # NOT retried
+
+    def test_budget_exhaustion_reraises(self):
+        ex = self._make_executor()
+        ex._retry_budget_s = 0.05  # tiny budget
+        calls = {"n": 0}
+
+        def fn():
+            calls["n"] += 1
+            raise ConnectionError("still down")
+
+        with self.assertRaises(ConnectionError):
+            ex._with_modal_retry("probe", fn)
+        self.assertGreaterEqual(calls["n"], 2)  # retried before giving up
+
+    def test_run_val_retries_transient_sandbox_create(self):
+        # First create raises a transient connection error; the second succeeds.
+        ex = self._make_executor(create_transient_failures=1)
+        ex._retry_budget_s = 5.0
+        res = ex.run_val("0")
+        self.assertTrue(res["success"], res)
+        self.assertEqual(res["primary_metric"], 0.75)
+        self.assertEqual(self.record["create"], 2)  # failed once, retried, succeeded
+
+
+class TestReconnectPoll(_ModalExecutorTestBase):
+    """(b1) A transient drop DURING the eval reconnects + polls the result file
+    (no re-run) instead of failing the step."""
+
+    def _fake_reconnect(self):
+        return FakeSandbox(STUB_REMOTE_ROOT, self.remote_root_local, self.record)
+
+    def test_reconnect_and_poll_recovers_when_result_present(self):
+        ex = self._make_executor()
+        ex.timeout = 5
+        ex._sandbox_id = "sb-fake"
+        ex._reconnect_sandbox = self._fake_reconnect
+        # The eval "finished" and wrote its result before the connection dropped.
+        rp = osp.join(self.remote_repo, "results_tmp")
+        os.makedirs(rp, exist_ok=True)
+        with open(osp.join(rp, "val_info.json"), "w") as f:
+            f.write('{"acc": 0.9}')
+
+        res = ex._reconnect_and_poll("results_tmp/val_info.json")
+        self.assertEqual(res.returncode, 0)  # recovered without re-running
+
+    def test_reconnect_and_poll_fails_when_no_result_by_deadline(self):
+        ex = self._make_executor()
+        ex.timeout = 0.05            # short poll deadline
+        ex._sandbox_id = "sb-fake"
+        ex._reconnect_sandbox = self._fake_reconnect
+
+        res = ex._reconnect_and_poll("results_tmp/never_written.json")
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("not found after reconnect", res.stderr)
+
+    def test_run_phase_routes_mid_eval_transient_to_reconnect(self):
+        import benchmark.modal_executor as me
+
+        record = self.record
+        remote_root_local = self.remote_root_local
+        remote_repo = self.remote_repo
+
+        class ReconnectExecutor(me.ModalExecutor):
+            _RETRY_BACKOFF_START = 0.001
+            _RETRY_BACKOFF_CAP = 0.001
+            _RECONNECT_POLL_INTERVAL = 0.001
+
+            def _sb_create(self_inner):
+                record["create"] += 1
+                return FakeSandbox(STUB_REMOTE_ROOT, remote_root_local, record)
+
+            def _run_command(self_inner, command):
+                # Command ran on the remote sandbox (wrote its result) but the
+                # orchestrator lost the connection before reading the outcome.
+                raise ConnectionError("Could not connect to the Modal server.")
+
+            def _reconnect_and_poll(self_inner, output_path):
+                record["reconnect_called"] = record.get("reconnect_called", 0) + 1
+                rp = osp.join(remote_repo, "results_tmp")
+                os.makedirs(rp, exist_ok=True)
+                with open(osp.join(rp, osp.basename(output_path)), "w") as f:
+                    f.write('{"acc": 0.91}')
+                return me.SubprocessResult(0)
+
+        config = {
+            "repo_dir": self.repo_dir, "conda_env": self.CONDA_ENV, "metric": "acc",
+            "target_files": ["train.py"], "val_command": "x", "test_command": "x",
+        }
+        ex = ReconnectExecutor(config, "agent", self.TASK, "exp", timeout=600)
+        ex._retry_budget_s = 5.0
+        ex.workspace_dir = osp.join(self.tmp, "ws_reconnect")
+        os.makedirs(ex.workspace_dir, exist_ok=True)
+
+        res = ex.run_val("0")
+        self.assertTrue(res["success"], res)
+        self.assertEqual(res["primary_metric"], 0.91)
+        self.assertEqual(record.get("reconnect_called"), 1)
+
+
+class TestAuditFollowups(_ModalExecutorTestBase):
+    """Coverage gaps surfaced by the multi-agent audit (M1, L3-L6) + the None
+    guard added to _reconnect_and_poll."""
+
+    def test_reconnect_and_poll_end_to_end_through_run_phase(self):
+        # M1: the REAL _reconnect_and_poll runs INSIDE _run_phase — exercising the
+        # reconnect -> integrity-check -> pull -> teardown continuation against the
+        # reconnected handle (only _run_command + _reconnect_sandbox are stubbed).
+        ex = self._make_executor()  # metric defaults to "acc"
+        ex._retry_budget_s = 5.0
+        ex.timeout = 5
+        rec = self.record
+        remote_repo = self.remote_repo
+        remote_root_local = self.remote_root_local
+
+        def fake_run_command(command):
+            # the eval ran on the remote sandbox + wrote its result, then the
+            # orchestrator lost the connection before reading the outcome
+            rp = osp.join(remote_repo, "results_tmp")
+            os.makedirs(rp, exist_ok=True)
+            with open(osp.join(rp, "val_info.json"), "w") as f:
+                f.write('{"acc": 0.88}')
+            raise ConnectionError("Could not connect to the Modal server.")
+
+        def fake_reconnect():
+            rec["reconnect"] = rec.get("reconnect", 0) + 1
+            return FakeSandbox(STUB_REMOTE_ROOT, remote_root_local, rec)
+
+        ex._run_command = fake_run_command
+        ex._reconnect_sandbox = fake_reconnect
+
+        res = ex.run_val("0")
+        self.assertTrue(res["success"], res)
+        self.assertEqual(res["primary_metric"], 0.88)   # pulled via the reconnected handle
+        self.assertEqual(rec.get("reconnect"), 1)        # real _reconnect_and_poll ran
+        self.assertEqual(rec["terminated"], 1)           # teardown on the reconnected handle
+
+    def test_ensure_sandbox_captures_object_id(self):
+        # L3: _ensure_sandbox records sb.object_id for later reconnect.
+        ex = self._make_executor()
+        ex._ensure_sandbox()
+        self.assertEqual(ex._sandbox_id, "sb-fake")
+        self.assertEqual(ex._sandbox_id, ex._sb.object_id)
+
+    def test_reconnect_and_poll_no_sandbox_id_fails_gracefully(self):
+        # L3: no captured id -> failure result, never modal.Sandbox.from_id(None).
+        ex = self._make_executor()
+        ex._sandbox_id = None
+        res = ex._reconnect_and_poll("results_tmp/val_info.json")
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("no sandbox id", res.stderr)
+
+    def test_reconnect_poll_recovers_after_in_loop_transients(self):
+        # L4: transient errors DURING the poll loop are tolerated; once the file
+        # appears we recover.
+        ex = self._make_executor()
+        ex.timeout = 5
+        ex._sandbox_id = "sb-fake"
+        rp = osp.join(self.remote_repo, "results_tmp")
+        os.makedirs(rp, exist_ok=True)
+        with open(osp.join(rp, "val_info.json"), "w") as f:
+            f.write('{"acc": 0.9}')
+        calls = {"n": 0}
+
+        def flaky_reconnect():
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise ConnectionError("down")
+            return FakeSandbox(STUB_REMOTE_ROOT, self.remote_root_local, self.record)
+
+        ex._reconnect_sandbox = flaky_reconnect
+        res = ex._reconnect_and_poll("results_tmp/val_info.json")
+        self.assertEqual(res.returncode, 0)
+        self.assertGreaterEqual(calls["n"], 3)
+
+    def test_reconnect_poll_fails_if_transient_until_deadline(self):
+        # L4: persistent transient until the deadline -> bounded failure result.
+        ex = self._make_executor()
+        ex.timeout = 0.05
+        ex._sandbox_id = "sb-fake"
+
+        def always_down():
+            raise ConnectionError("always down")
+
+        ex._reconnect_sandbox = always_down
+        res = ex._reconnect_and_poll("results_tmp/val_info.json")
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("not found after reconnect", res.stderr)
+
+    def test_push_transient_degrades_to_failure_dict(self):
+        # L5: a transient during push (before the eval) is NOT reconnected — it
+        # falls through to a failure dict + teardown (push runs before step 7).
+        import benchmark.modal_executor as me
+
+        rec = self.record
+        remote_root_local = self.remote_root_local
+
+        class PushFail(me.ModalExecutor):
+            _RETRY_BACKOFF_START = 0.001
+            _RETRY_BACKOFF_CAP = 0.001
+
+            def _sb_create(self_inner):
+                rec["create"] += 1
+                return FakeSandbox(STUB_REMOTE_ROOT, remote_root_local, rec)
+
+            def _sb_write(self_inner, remote_path, data):
+                raise ConnectionError("Could not connect to the Modal server.")
+
+        config = {
+            "repo_dir": self.repo_dir, "conda_env": self.CONDA_ENV, "metric": "acc",
+            "target_files": ["train.py"], "val_command": "x", "test_command": "x",
+        }
+        ex = PushFail(config, "agent", self.TASK, "exp", timeout=600)
+        ex._retry_budget_s = 5.0
+        ex.workspace_dir = osp.join(self.tmp, "ws_pushfail")
+        os.makedirs(ex.workspace_dir, exist_ok=True)
+
+        res = ex.run_val("0")
+        self.assertFalse(res["success"])
+        self.assertIn("Could not connect", res["error"])
+        self.assertEqual(rec["terminated"], 1)  # torn down, not reconnected
+
+    def test_sb_read_reraises_transient_but_empty_on_missing(self):
+        # L6: _sb_read returns "" for a genuinely-missing file but RE-RAISES a
+        # transient (so _with_modal_retry can retry the manifest read).
+        ex = self._make_executor()
+        ex._sb = FakeSandbox(STUB_REMOTE_ROOT, self.remote_root_local, self.record)
+        self.assertEqual(ex._sb_read(STUB_REMOTE_ROOT + "/does/not/exist.json"), "")
+
+        def flaky_open(path, mode="r"):
+            raise ConnectionError("down")
+
+        ex._sb.open = flaky_open
+        with self.assertRaises(ConnectionError):
+            ex._sb_read(STUB_REMOTE_ROOT + "/whatever.json")
 
 
 if __name__ == "__main__":

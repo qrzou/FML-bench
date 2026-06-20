@@ -202,6 +202,18 @@ class TestProcessAndTimeoutContract(unittest.TestCase):
         import modal
         self.assertTrue(hasattr(modal.Sandbox, "terminate"))
 
+    def test_connection_error_importable(self):
+        # _transient_modal_errors() retries/reconnects on this (the observed
+        # "Could not connect to the Modal server").
+        from modal.exception import ConnectionError as ModalConnErr
+        self.assertTrue(issubclass(ModalConnErr, BaseException))
+
+    def test_sandbox_from_id_exists_for_reconnect(self):
+        # (b1) _reconnect_sandbox() reconnects to a running sandbox by id.
+        import modal
+        self.assertTrue(hasattr(modal.Sandbox, "from_id"))
+        _accepts(self, modal.Sandbox.from_id, ["sandbox_id"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

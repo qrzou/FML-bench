@@ -35,6 +35,7 @@ import json
 import os
 import os.path as osp
 import shutil
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -48,6 +49,13 @@ from benchmark.executor import (
 
 class ModalExecutor(BenchmarkExecutor):
     """Run val/test commands in an ephemeral Modal GPU sandbox (R2 fidelity)."""
+
+    # Transient-error backoff / reconnect cadence (class defaults; instance-
+    # overridable — tests shrink these).
+    _RETRY_BACKOFF_START = 5.0       # first retry delay (s)
+    _RETRY_BACKOFF_CAP = 60.0        # max backoff between retries (s)
+    _RECONNECT_POLL_INTERVAL = 10.0  # (b1) gap between result-file polls (s)
+    _RECONNECT_POLL_MAX_S = 7200.0   # (b1) poll cap when self.timeout is None
 
     def __init__(self, config: dict, *args, **kwargs):
         super().__init__(config, *args, **kwargs)
@@ -66,8 +74,13 @@ class ModalExecutor(BenchmarkExecutor):
         # `cp ../../../ml_tasks/<task>/...` paths in val_command — match local.
         self._remote_repo_dir = self._derive_remote_repo_dir()
         self._sb = None              # the live Modal sandbox handle (or None)
+        self._sandbox_id = None      # remote sandbox id, for mid-eval reconnect (b1)
         self._app = None             # cached running App handle (modal.App.lookup)
         self._tree_hash_checked = False
+        # Transient Modal-infra resilience (NOT eval failures): retry idempotent
+        # ops + reconnect-poll the result on a mid-eval drop, up to this wall-clock
+        # budget (default 30 min). Overridable per task via config.
+        self._retry_budget_s = float(self.config.get("modal_retry_budget_seconds", 1800.0))
         # SIGINT backstop: shared handler calls sys.exit -> atexit runs this.
         atexit.register(self._atexit_terminate)
 
@@ -177,7 +190,15 @@ class ModalExecutor(BenchmarkExecutor):
             #    _protect_git_dir). Fresh-container search evals don't need it,
             #    but the shared pre_test_val->final_test sandbox does.
             print(f"Running {command_key}: {command}")
-            result = self._run_command(command)
+            try:
+                result = self._run_command(command)
+            except self._transient_modal_errors() as e:
+                # (b1) The orchestrator lost its connection mid-eval, but the
+                # command keeps running on the remote sandbox. Reconnect by id and
+                # poll for the result file instead of re-running (no wasted work).
+                print(f"Connection lost during {command_key}; reconnecting and "
+                      f"polling for the result (no re-run): {e}")
+                result = self._reconnect_and_poll(output_path)
 
             # 8. Verify remote workspace integrity after execution.
             integrity_error = self._check_workspace_integrity()
@@ -288,8 +309,9 @@ class ModalExecutor(BenchmarkExecutor):
 
         exec_timeout = self._exec_timeout_exc()
         # The spawn+wait is wrapped so that (a) a server-side timeout becomes the
-        # parent's byte-identical timeout result and (b) a transient Modal
-        # spawn/stream error is recorded as a failed eval (str(e)) so the agent
+        # parent's byte-identical timeout result, (b) a TRANSIENT Modal infra error
+        # PROPAGATES (callers retry idempotent ops / reconnect-poll the eval), and
+        # (c) any other error is recorded as a failed eval (str(e)) so the agent
         # loop continues — mirroring the parent _run_command's except branches
         # (executor.py) — rather than crashing the whole run.
         try:
@@ -307,6 +329,12 @@ class ModalExecutor(BenchmarkExecutor):
             # remote eval reports exactly like local (executor.py TimeoutExpired).
             print(f"Command timed out after {self.timeout} seconds")
             return SubprocessResult(1, stderr=f"Timeout after {self.timeout} seconds")
+        except self._transient_modal_errors():
+            # Transient Modal infra error (e.g. "Could not connect to the Modal
+            # server"). PROPAGATE so callers can recover: idempotent control ops
+            # retry via _with_modal_retry; the main eval reconnects + polls in
+            # _run_phase (b1). NOT swallowed into a failure result here.
+            raise
         except Exception as e:  # noqa: BLE001
             print(f"Error running remote command: {e}")
             return SubprocessResult(1, stderr=str(e))
@@ -330,6 +358,95 @@ class ModalExecutor(BenchmarkExecutor):
             class _NeverRaised(Exception):
                 pass
             return _NeverRaised
+
+    # ------------------------------------------------------------------
+    # Transient-error resilience (Modal infra, NOT eval failures)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _transient_modal_errors():
+        """Exception types treated as TRANSIENT Modal infra errors — safe to retry
+        / reconnect (e.g. "Could not connect to the Modal server", raised in
+        modal/_utils/grpc_utils.py). Deliberately NARROW: NOT auth/not-found/
+        invalid/timeout/nonzero-returncode, which are deterministic and fail fast.
+        """
+        errs = [ConnectionError]  # builtin (the grpc layer may raise this)
+        try:
+            from modal.exception import ConnectionError as _ModalConnErr  # VERIFY (transient)
+            errs.append(_ModalConnErr)
+        except Exception:  # noqa: BLE001  (modal absent off the modal path / in tests)
+            pass
+        return tuple(errs)
+
+    def _with_modal_retry(self, op_name: str, fn):
+        """Run *fn*, retrying ONLY transient Modal connection errors with
+        exponential backoff until self._retry_budget_s elapses, then re-raise.
+
+        For IDEMPOTENT ops ONLY (create, reads, existence checks, result pull) —
+        never the main eval command (retrying that would re-run it). Non-transient
+        errors propagate immediately (no retry). On the happy path fn runs once.
+        """
+        transient = self._transient_modal_errors()
+        start = time.monotonic()
+        delay = self._RETRY_BACKOFF_START
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                return fn()
+            except transient as e:
+                elapsed = time.monotonic() - start
+                if elapsed >= self._retry_budget_s:
+                    print(f"Modal {op_name}: transient error after {attempt} attempts "
+                          f"/ {elapsed:.0f}s; retry budget exhausted: {e}")
+                    raise
+                print(f"Modal {op_name}: transient error (attempt {attempt}, "
+                      f"{elapsed:.0f}s elapsed); retrying in {delay:.0f}s: {e}")
+                time.sleep(delay)
+                delay = min(delay * 2.0, self._RETRY_BACKOFF_CAP)
+
+    def _reconnect_sandbox(self):
+        """Reconnect to the still-running sandbox by id (overridable in tests).
+
+        Modal sandboxes keep running independent of the client connection, so a
+        dropped connection is recovered with Sandbox.from_id — no re-run.
+        """
+        import modal
+        return modal.Sandbox.from_id(self._sandbox_id)  # VERIFY (from_id; live api 1.5.0)
+
+    def _reconnect_and_poll(self, output_path: str) -> SubprocessResult:
+        """(b1) After a transient drop DURING the eval, reconnect to the running
+        sandbox and poll for the result file — no re-run.
+
+        The remote command keeps running; once it writes results_tmp/<phase>.json
+        we recover (rc 0). Polls for up to ``self.timeout`` seconds MEASURED FROM
+        RECONNECT (a 7200s cap when self.timeout is None — note the final test
+        passes no server-side exec timeout, so this cap is the poll's own ceiling),
+        tolerating further transient errors within that window. Always finite;
+        returns a failure result if the file never appears or there is no sandbox
+        id to reconnect to.
+        """
+        if not self._sandbox_id:
+            return SubprocessResult(
+                1, stderr="Connection lost during eval and no sandbox id to reconnect to")
+        remote_fp = f"{self._remote_repo_dir}/{output_path}"
+        budget = (self.timeout if isinstance(self.timeout, (int, float)) and self.timeout > 0
+                  else self._RECONNECT_POLL_MAX_S)
+        deadline = time.monotonic() + budget
+        transient = self._transient_modal_errors()
+        while time.monotonic() < deadline:
+            try:
+                self._sb = self._reconnect_sandbox()
+                proc = self._sb.exec("bash", "-c", f"test -e {self._shq(remote_fp)}")  # VERIFY
+                proc.wait()
+                if getattr(proc, "returncode", 1) == 0:
+                    print("Reconnected; result file present — recovered without re-running.")
+                    return SubprocessResult(0)
+            except transient as e:
+                print(f"Reconnect/poll transient error, will keep trying: {e}")
+            time.sleep(self._RECONNECT_POLL_INTERVAL)
+        return SubprocessResult(
+            1, stderr="Connection lost during eval; result not found after reconnect/poll")
 
     def kill_running_process(self):
         """Stop the in-flight remote eval on an external signal.
@@ -366,7 +483,11 @@ class ModalExecutor(BenchmarkExecutor):
 
     def _remote_exists(self, path: str, is_dir: bool) -> bool:
         flag = "-d" if is_dir else "-e"
-        res = self._sb_exec(f"test {flag} {self._shq(path)}", use_conda=False)
+        # Idempotent check -> retry transient connection errors (a).
+        res = self._with_modal_retry(
+            "remote-exists",
+            lambda: self._sb_exec(f"test {flag} {self._shq(path)}", use_conda=False),
+        )
         return res.returncode == 0
 
     # ------------------------------------------------------------------
@@ -377,7 +498,10 @@ class ModalExecutor(BenchmarkExecutor):
         """Create the sandbox from the baked image if none is live; assert hash."""
         if self._sb is not None:
             return
-        self._sb = self._sb_create()  # VERIFY (Sandbox.create from task image)
+        # Retry transient connection errors during creation (a); App.lookup +
+        # Sandbox.create both go through here. Record the id for reconnect (b1).
+        self._sb = self._with_modal_retry("sandbox-create", self._sb_create)  # VERIFY
+        self._sandbox_id = getattr(self._sb, "object_id", None)
         if not self._tree_hash_checked:
             self._assert_tree_hash()
             self._tree_hash_checked = True
@@ -390,14 +514,17 @@ class ModalExecutor(BenchmarkExecutor):
         """
         from modal_app import MANIFEST_DIR
         manifest_path = f"{self._remote_root}/{MANIFEST_DIR}/{self.task}.json"
-        raw = self._sb_read(manifest_path)  # VERIFY
+        raw = self._with_modal_retry("read-manifest", lambda: self._sb_read(manifest_path))  # VERIFY
         try:
             recorded = json.loads(raw)["tree_hash"]
         except (ValueError, KeyError, TypeError):
             print(f"Warning: could not read build manifest at {manifest_path}; "
                   "skipping tree-hash assertion")
             return
-        res = self._sb_exec("git rev-parse HEAD^{tree}", use_conda=False)
+        res = self._with_modal_retry(
+            "git-rev-parse",
+            lambda: self._sb_exec("git rev-parse HEAD^{tree}", use_conda=False),
+        )
         actual = (res.stdout or "").strip()
         if actual and actual != recorded:
             raise RuntimeError(
@@ -408,9 +535,11 @@ class ModalExecutor(BenchmarkExecutor):
 
     def _teardown_sandbox(self):
         if self._sb is None:
+            self._sandbox_id = None
             return
         sb = self._sb
         self._sb = None
+        self._sandbox_id = None
         try:
             self._sb_terminate(sb)  # VERIFY
         except Exception as e:  # noqa: BLE001
@@ -477,7 +606,7 @@ class ModalExecutor(BenchmarkExecutor):
         remote_fp = f"{self._remote_repo_dir}/{output_path}"
         if not self._remote_exists(remote_fp, is_dir=False):
             return False
-        data = self._sb_read_bytes(remote_fp)  # VERIFY
+        data = self._with_modal_retry("pull-results", lambda: self._sb_read_bytes(remote_fp))  # VERIFY
         local_fp = osp.join(osp.abspath(self.repo_dir), output_path)
         os.makedirs(osp.dirname(local_fp), exist_ok=True)
         with open(local_fp, "wb") as f:
@@ -585,8 +714,10 @@ class ModalExecutor(BenchmarkExecutor):
         try:
             with self._sb.open(remote_path, "r") as f:  # VERIFY
                 return f.read()
+        except self._transient_modal_errors():
+            raise  # transient infra -> let _with_modal_retry handle it
         except Exception:  # noqa: BLE001
-            return ""
+            return ""  # genuinely missing / unreadable
 
     def _sb_read_bytes(self, remote_path: str) -> bytes:
         """Read *remote_path* from the sandbox as bytes."""
