@@ -76,18 +76,54 @@ class FakeProc:
         return self.returncode
 
 
+class _FakeFS:
+    """Stand-in for modal's ``Sandbox.filesystem`` namespace (local-temp backed).
+
+    Mirrors the live _SandboxFilesystem surface our adapters call — note the
+    (data, remote_path) arg order of write_bytes (data first), pinned by the L3
+    contract test. Reads raise FileNotFoundError when absent, so _sb_read's
+    `except Exception -> ""` matches the old open()-based behavior.
+    """
+    def __init__(self, sb):
+        self._sb = sb
+
+    def make_directory(self, remote_path, *, create_parents=True):
+        os.makedirs(self._sb._map(remote_path), exist_ok=create_parents)
+
+    def write_bytes(self, data, remote_path):
+        local = self._sb._map(remote_path)
+        os.makedirs(osp.dirname(local), exist_ok=True)
+        with open(local, "wb") as f:
+            f.write(data)
+
+    def read_bytes(self, remote_path):
+        with open(self._sb._map(remote_path), "rb") as f:
+            return f.read()
+
+    def read_text(self, remote_path):
+        with open(self._sb._map(remote_path), "r") as f:
+            return f.read()
+
+
 class FakeSandbox:
     """Maps REMOTE_ROOT onto a local temp dir and runs commands with real bash.
 
     Only the Modal boundary is faked: the ``conda run --no-capture-output -n
     <env>`` prefix is stripped (and recorded), remote-absolute paths are
-    rewritten to the temp dir, then a genuine subprocess runs.
+    rewritten to the temp dir, then a genuine subprocess runs. File transfer
+    goes through ``.filesystem`` (the live API; Sandbox.open is deprecated) — a
+    cached _FakeFS so a test can monkeypatch e.g. filesystem.read_text.
     """
     def __init__(self, remote_root, local_root, record):
         self.remote_root = remote_root      # e.g. "/root/fml-bench"
         self.local_root = local_root        # temp dir standing in for it
         self.record = record
         self.object_id = "sb-fake"          # modal Sandbox.object_id (reconnect id)
+        self._fs = _FakeFS(self)            # cached, like modal's Sandbox._filesystem
+
+    @property
+    def filesystem(self):
+        return self._fs
 
     def _map(self, s):
         if isinstance(s, str) and self.remote_root in s:
@@ -115,12 +151,6 @@ class FakeSandbox:
         run_env["PATH"] = (run_env.get("PATH", "") + ":" + os.environ.get("PATH", "")).strip(":")
         cp = subprocess.run(real, cwd=wd, env=run_env, capture_output=True, text=True)
         return FakeProc(cp.returncode, cp.stdout, cp.stderr)
-
-    def open(self, path, mode="r"):
-        local = self._map(path)
-        if "w" in mode:
-            os.makedirs(osp.dirname(local), exist_ok=True)
-        return open(local, mode)
 
     def set_tags(self, tags):
         self.record["tags"] = dict(tags)
@@ -224,6 +254,16 @@ class _ModalExecutorTestBase(unittest.TestCase):
         with open(osp.join(mdir, f"{self.TASK}.json"), "w") as f:
             json.dump({"task": self.TASK, "repo_dir": self.remote_repo,
                        "tree_hash": tree_hash}, f)
+
+    def _write_exec_rc(self, rc, repo=None):
+        """Write the exit-code sentinel that _run_command leaves for the reconnect
+        path (M2). The reconnect recovers the eval's TRUE rc from this file."""
+        import benchmark.modal_executor as me
+        repo = repo or self.remote_repo
+        fp = osp.join(repo, me.ModalExecutor._EXEC_RC_SENTINEL)
+        os.makedirs(osp.dirname(fp), exist_ok=True)
+        with open(fp, "w") as f:
+            f.write(str(rc))
 
     def _make_executor(self, create_transient_failures=0, **config_overrides):
         import benchmark.modal_executor as me
@@ -389,10 +429,11 @@ class TestErrorContract(_ModalExecutorTestBase):
 
 
 class TestTimeoutContract(_ModalExecutorTestBase):
-    def test_server_side_timeout_yields_parent_byte_identical_result(self):
-        # Option B: modal enforces the wall-clock via Sandbox.exec(timeout=) and
-        # raises ExecTimeoutError from .wait()/.read(); _sb_exec must catch it and
-        # return the parent's byte-identical "Timeout after N seconds" result.
+    def test_server_side_timeout_read_raise_yields_byte_identical_result(self):
+        # The .read()/.wait() RAISE path: modal MAY raise ExecTimeoutError (e.g. from
+        # .read() on the exec deadline); _sb_exec's `except exec_timeout` must catch
+        # it and return the parent's byte-identical "Timeout after N seconds" result.
+        # (The common path — wait() returns -1, swallowing the error — is next.)
         import benchmark.modal_executor as me
 
         record = self.record
@@ -425,6 +466,67 @@ class TestTimeoutContract(_ModalExecutorTestBase):
         res = ex._sb_exec("sleep 999", use_conda=False)
         self.assertEqual(res.returncode, 1)
         self.assertEqual(res.stderr, "Timeout after 123 seconds")
+
+    def test_server_side_timeout_returncode_minus_one_yields_timeout_result(self):
+        # The REAL modal 1.5 path: ContainerProcess.wait() SWALLOWS ExecTimeoutError
+        # and returns rc == -1 (does NOT raise). _sb_exec must map rc==-1 (with a
+        # wall-clock set) to the parent's byte-identical "Timeout after N seconds".
+        import benchmark.modal_executor as me
+
+        record = self.record
+        remote_root_local = self.remote_root_local
+
+        class MinusOneExecutor(me.ModalExecutor):
+            def _sb_create(self_inner):
+                record["create"] += 1
+                return FakeSandbox(STUB_REMOTE_ROOT, remote_root_local, record)
+
+            def _sb_spawn(self_inner, argv, cwd):
+                return object()
+
+            def _sb_wait(self_inner, proc):
+                return (-1, "", "")  # modal's swallowed-timeout sentinel
+
+        config = {"repo_dir": self.repo_dir, "conda_env": self.CONDA_ENV,
+                  "val_command": "sleep 999", "metric": "acc"}
+        ex = MinusOneExecutor(config, "agent", self.TASK, "exp", timeout=123)
+        ex.workspace_dir = osp.join(self.tmp, "ws_minus1")
+        os.makedirs(ex.workspace_dir, exist_ok=True)
+        ex._ensure_sandbox()
+
+        res = ex._sb_exec("sleep 999", use_conda=False)
+        self.assertEqual(res.returncode, 1)
+        self.assertEqual(res.stderr, "Timeout after 123 seconds")
+
+    def test_returncode_minus_one_without_timeout_is_not_treated_as_timeout(self):
+        # Guard: rc==-1 with NO wall-clock (final test, timeout=None) must NOT be
+        # mapped to a timeout — it surfaces as a plain failed eval (rc preserved).
+        import benchmark.modal_executor as me
+
+        record = self.record
+        remote_root_local = self.remote_root_local
+
+        class MinusOneNoTimeout(me.ModalExecutor):
+            def _sb_create(self_inner):
+                record["create"] += 1
+                return FakeSandbox(STUB_REMOTE_ROOT, remote_root_local, record)
+
+            def _sb_spawn(self_inner, argv, cwd):
+                return object()
+
+            def _sb_wait(self_inner, proc):
+                return (-1, "", "boom")
+
+        config = {"repo_dir": self.repo_dir, "conda_env": self.CONDA_ENV,
+                  "val_command": "x", "metric": "acc"}
+        ex = MinusOneNoTimeout(config, "agent", self.TASK, "exp", timeout=None)
+        ex.workspace_dir = osp.join(self.tmp, "ws_minus1b")
+        os.makedirs(ex.workspace_dir, exist_ok=True)
+        ex._ensure_sandbox()
+
+        res = ex._sb_exec("x", use_conda=False)
+        self.assertEqual(res.returncode, -1)            # NOT mapped to a timeout
+        self.assertNotIn("Timeout", res.stderr or "")
 
     def test_transient_error_becomes_failed_eval_not_crash(self):
         # A non-timeout exception from _sb_wait must degrade to a failed eval
@@ -549,14 +651,24 @@ class TestReconnectPoll(_ModalExecutorTestBase):
         ex.timeout = 5
         ex._sandbox_id = "sb-fake"
         ex._reconnect_sandbox = self._fake_reconnect
-        # The eval "finished" and wrote its result before the connection dropped.
-        rp = osp.join(self.remote_repo, "results_tmp")
-        os.makedirs(rp, exist_ok=True)
-        with open(osp.join(rp, "val_info.json"), "w") as f:
-            f.write('{"acc": 0.9}')
+        # The eval finished (rc 0) and wrote its exit-code sentinel before the drop.
+        self._write_exec_rc(0)
 
         res = ex._reconnect_and_poll("results_tmp/val_info.json")
-        self.assertEqual(res.returncode, 0)  # recovered without re-running
+        self.assertEqual(res.returncode, 0)  # recovered the real rc without re-running
+
+    def test_reconnect_and_poll_recovers_nonzero_returncode(self):
+        # M2: the reconnect path recovers the eval's TRUE exit code from the rc
+        # sentinel — a NONZERO exit is surfaced as failure, NOT a false success
+        # from mere result-file presence.
+        ex = self._make_executor()
+        ex.timeout = 5
+        ex._sandbox_id = "sb-fake"
+        ex._reconnect_sandbox = self._fake_reconnect
+        self._write_exec_rc(3)  # eval finished but exited nonzero
+
+        res = ex._reconnect_and_poll("results_tmp/val_info.json")
+        self.assertEqual(res.returncode, 3)  # NOT 0 — the real failure is surfaced
 
     def test_reconnect_and_poll_fails_when_no_result_by_deadline(self):
         ex = self._make_executor()
@@ -628,12 +740,14 @@ class TestAuditFollowups(_ModalExecutorTestBase):
         remote_root_local = self.remote_root_local
 
         def fake_run_command(command):
-            # the eval ran on the remote sandbox + wrote its result, then the
-            # orchestrator lost the connection before reading the outcome
+            # the eval ran on the remote sandbox + wrote its result AND its rc
+            # sentinel (exit 0), then the orchestrator lost the connection before
+            # reading the outcome
             rp = osp.join(remote_repo, "results_tmp")
             os.makedirs(rp, exist_ok=True)
             with open(osp.join(rp, "val_info.json"), "w") as f:
                 f.write('{"acc": 0.88}')
+            self._write_exec_rc(0, repo=remote_repo)
             raise ConnectionError("Could not connect to the Modal server.")
 
         def fake_reconnect():
@@ -670,10 +784,7 @@ class TestAuditFollowups(_ModalExecutorTestBase):
         ex = self._make_executor()
         ex.timeout = 5
         ex._sandbox_id = "sb-fake"
-        rp = osp.join(self.remote_repo, "results_tmp")
-        os.makedirs(rp, exist_ok=True)
-        with open(osp.join(rp, "val_info.json"), "w") as f:
-            f.write('{"acc": 0.9}')
+        self._write_exec_rc(0)  # eval finished (rc 0); reconnect recovers via the sentinel
         calls = {"n": 0}
 
         def flaky_reconnect():
@@ -741,10 +852,10 @@ class TestAuditFollowups(_ModalExecutorTestBase):
         ex._sb = FakeSandbox(STUB_REMOTE_ROOT, self.remote_root_local, self.record)
         self.assertEqual(ex._sb_read(STUB_REMOTE_ROOT + "/does/not/exist.json"), "")
 
-        def flaky_open(path, mode="r"):
+        def flaky_read_text(remote_path):
             raise ConnectionError("down")
 
-        ex._sb.open = flaky_open
+        ex._sb.filesystem.read_text = flaky_read_text  # transient infra read
         with self.assertRaises(ConnectionError):
             ex._sb_read(STUB_REMOTE_ROOT + "/whatever.json")
 

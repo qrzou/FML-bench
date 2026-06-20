@@ -1,11 +1,11 @@
 """
 Tests for benchmark.executor_factory.make_executor.
 
-These verify the eval-backend selection contract WITHOUT the modal package
-installed (the local path must never import modal):
+These verify the eval-backend selection contract (the local path must never
+import modal). They pass whether or not modal is installed:
   - local / unset backend returns a plain BenchmarkExecutor (not ModalExecutor)
-  - "modal" backend triggers the lazy import (ImportError here, since modal
-    is not installed), proving the local path is independent of modal
+  - "modal" backend triggers the lazy import: ImportError when modal is ABSENT
+    (proving the local path is independent of modal), else a ModalExecutor
   - importing the factory module does not import modal
 
 Runnable with stdlib unittest (pytest is not available):
@@ -47,17 +47,27 @@ class TestMakeExecutor(unittest.TestCase):
         self.assertIsInstance(ex, BenchmarkExecutor)
         self.assertEqual(type(ex), BenchmarkExecutor)
 
-    def test_modal_backend_raises_without_modal(self):
+    def test_modal_backend_imports_modal_executor(self):
+        import importlib.util
         from benchmark.executor_factory import make_executor
 
         # A new-format config so ModalExecutor.__init__ passes its config check
         # and reaches the lazy modal_app import (which imports modal).
         config = _minimal_config()
         config["val_command"] = "echo val"
-        # modal is not installed here, so the lazy import must fail.
-        with self.assertRaises((ImportError, ModuleNotFoundError)):
-            make_executor(config, "agent", "bench", "exp",
-                          eval_backend="modal")
+
+        if importlib.util.find_spec("modal") is None:
+            # modal ABSENT (the recommended env for the R1 layers): the lazy
+            # `from benchmark.modal_executor import ModalExecutor` must fail, proving
+            # the modal path is opt-in and the local path is independent of modal.
+            with self.assertRaises((ImportError, ModuleNotFoundError)):
+                make_executor(config, "agent", "bench", "exp", eval_backend="modal")
+        else:
+            # modal INSTALLED (e.g. the operator's live env): the lazy import
+            # succeeds and a ModalExecutor is returned. The factory does the right
+            # thing either way — assert it so this test passes in BOTH envs.
+            ex = make_executor(config, "agent", "bench", "exp", eval_backend="modal")
+            self.assertEqual(type(ex).__name__, "ModalExecutor")
 
     def test_factory_import_does_not_import_modal(self):
         # Drop any cached factory module so the import is exercised fresh.

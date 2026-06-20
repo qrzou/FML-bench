@@ -83,10 +83,26 @@ class TestModalSDKContract(unittest.TestCase):
 
     def test_sandbox_has_methods_we_call(self):
         Sandbox = self.modal.Sandbox
-        for name in ("create", "exec", "open", "set_tags", "get_tags",
+        # 'filesystem' replaces the deprecated 'open' (see test_sandbox_filesystem_api).
+        for name in ("create", "exec", "filesystem", "set_tags", "get_tags",
                      "terminate", "list"):
             self.assertTrue(hasattr(Sandbox, name),
                             f"modal.Sandbox has no '{name}' (we call it)")
+
+    def test_sandbox_filesystem_api(self):
+        # _sb_write/_sb_read/_sb_read_bytes go through Sandbox.filesystem
+        # (Sandbox.open/FileIO was deprecated 2026-03-09). Pin the methods we call
+        # AND the (data, remote_path) arg order of write_bytes — modal puts data
+        # FIRST, which is easy to get backwards.
+        from modal.sandbox import _SandboxFilesystem
+        for name in ("read_bytes", "read_text", "write_bytes", "make_directory"):
+            self.assertTrue(hasattr(_SandboxFilesystem, name),
+                            f"_SandboxFilesystem has no '{name}' (we call it)")
+        params = list(inspect.signature(_SandboxFilesystem.write_bytes).parameters)
+        self.assertEqual(params[1:3], ["data", "remote_path"],
+                         f"write_bytes signature changed (we pass data first): {params}")
+        # make_directory must accept create_parents= (we rely on mkdir -p semantics).
+        _accepts(self, _SandboxFilesystem.make_directory, ["create_parents"])
 
     def test_sandbox_create_accepts_our_kwargs(self):
         # We call modal.Sandbox.create(app=, image=, volumes=, workdir=, gpu=).
@@ -96,6 +112,20 @@ class TestModalSDKContract(unittest.TestCase):
     def test_sandbox_list_accepts_tags_filter(self):
         # reap() calls modal.Sandbox.list(tags=SANDBOX_TAG).
         _accepts(self, self.modal.Sandbox.list, ["tags"])
+
+    def test_reaper_uses_created_at_tag_not_attribute(self):
+        # modal 1.5's Sandbox has NO created_at attribute, so _sb_create stamps a
+        # creation epoch into the tags and the reaper (provision.py::_sb_age_seconds)
+        # reads it back via get_tags(). Pin both: get_tags/set_tags exist, and
+        # created_at is ABSENT (tripwire — if a future modal adds it, the reaper
+        # could read the real attribute directly instead of the tag).
+        self.assertTrue(hasattr(self.modal.Sandbox, "get_tags"))
+        self.assertTrue(hasattr(self.modal.Sandbox, "set_tags"))
+        self.assertFalse(
+            hasattr(self.modal.Sandbox, "created_at"),
+            "modal.Sandbox now exposes 'created_at'; the reaper could read it "
+            "directly instead of the created_at tag (provision.py::_sb_age_seconds)",
+        )
 
     def test_image_builder_methods_exist(self):
         Image = self.modal.Image
@@ -166,6 +196,24 @@ class TestProcessAndTimeoutContract(unittest.TestCase):
         # _sb_spawn passes timeout= (and workdir=, env=) to Sandbox.exec.
         import modal
         _accepts(self, modal.Sandbox.exec, ["timeout", "workdir", "env"])
+
+    def test_sandbox_create_default_timeout_is_finite(self):
+        # TRIPWIRE: modal's Sandbox.create `timeout` (= MAX SANDBOX LIFETIME) has a
+        # FINITE default (300s in 1.5.0), NOT "unbounded". So _sb_create MUST pass an
+        # explicit timeout= >= the eval budget; omitting it would silently cap every
+        # eval at the default. Pin the default is finite so the "omit means unbounded"
+        # mistake (a real pre-fix bug) cannot regress.
+        import inspect
+        import modal
+        try:
+            default = inspect.signature(modal.Sandbox.create).parameters["timeout"].default
+        except (ValueError, TypeError, KeyError):
+            self.skipTest("Sandbox.create signature not introspectable")
+            return
+        self.assertIsInstance(default, int)
+        self.assertGreater(default, 0,
+                           "Sandbox.create timeout default is not a finite positive cap; "
+                           "revisit _sb_create's explicit-timeout assumption")
 
     def test_exec_timeout_error_importable_where_we_catch_it(self):
         # _exec_timeout_exc() does `from modal.exception import ExecTimeoutError`.

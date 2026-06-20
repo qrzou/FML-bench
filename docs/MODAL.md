@@ -91,8 +91,10 @@ python -m venv /tmp/modalvenv
 /tmp/modalvenv/bin/python tests/test_modal_api_contract.py
 ```
 
-Layer 3 introspects the installed SDK: `Sandbox.create/exec/open/set_tags/get_tags/
-terminate/list`, the `Image` builder chain, `add_local_dir(remote_path=,copy=,ignore=)`,
+Layer 3 introspects the installed SDK: `Sandbox.create/exec/filesystem/set_tags/get_tags/
+terminate/list`, the `Sandbox.filesystem` namespace (`read_bytes/read_text/write_bytes/
+make_directory`, incl. write_bytes' `(data, remote_path)` arg order — `Sandbox.open` was
+deprecated 2026-03-09), the `Image` builder chain, `add_local_dir(remote_path=,copy=,ignore=)`,
 `run_function(args=,gpu=)`, the `ExecTimeoutError` import path, the `ContainerProcess`
 handle (`wait/poll/returncode/stdout/stderr` — and, deliberately, the ABSENCE of a
 per-process kill), and the real `modal_app` constants / `gpu_map` A100 defaults. It SKIPS
@@ -136,7 +138,7 @@ spike in §3 must confirm are:
 | image build | `Image` conda env build via `run_function` (runs the real `setup.*` fns at build) | how a Python builder fn runs in the image build, on a **GPU builder** when needed, with **secrets** |
 | `Volume` | per-task data / persistent-working-dir volume | create/mount RO and RW, commit/reload semantics |
 | gpu strings | `gpu="A100"` (the only GPU all GPU-tasks use) + no `gpu=` for CPU-only tasks | that `"A100"` is the right Modal label and that omitting `gpu=` gives a CPU sandbox |
-| reaper | `Sandbox.set_tags` / `Sandbox.list(tags=)` / `sb.created_at` for the tag+age reaper (NO server-side TTL is set — §7) | the tag / list-by-tag / created-at API used by `provision.py::reap` |
+| reaper | `Sandbox.set_tags` / `Sandbox.list(tags=)` / `get_tags()` reads the `created_at` TAG we stamp at create (modal 1.5 `Sandbox` has no `created_at` attr); a sandbox max-lifetime IS set (§7) | the tag / list-by-tag / get_tags API used by `provision.py::reap` |
 
 > If the table above and the actual `# VERIFY` comments in the source disagree, **the
 > source wins** — re-run the two `grep`s and reconcile before the spike. (At the time this
@@ -216,9 +218,10 @@ Confirm, one at a time:
    another, confirm visibility (fallback / gated-data path).
 9. **GPU strings.** All GPU-using tasks use `gpu="A100"` (`modal_app/gpu_map.py`); confirm
    `"A100"` is accepted and `nvidia-smi` runs, and that a CPU-only task (no `gpu=`) starts.
-10. **Reaper.** Confirm `Sandbox.set_tags`, `Sandbox.list(tags=...)`, and `sb.created_at`
-    work so `provision.py::reap` can list/terminate ONLY this app's tagged sandboxes by age
-    (§7). No server-side idle/TTL is set on sandboxes by design (the final test is unbounded).
+10. **Reaper.** Confirm `Sandbox.set_tags`, `Sandbox.list(tags=...)`, and `get_tags()` work so
+    `provision.py::reap` can list/terminate ONLY this app's tagged sandboxes by age. modal 1.5's
+    `Sandbox` has NO `created_at` attribute, so `_sb_create` stamps a `created_at` epoch into the
+    tags and `reap` reads it back via `get_tags()`. A sandbox max-lifetime IS set at create (§7).
 
 Tear down everything the spike created:
 
@@ -360,13 +363,14 @@ There are three layers (design §5 + §12.3):
    modal app list      # the run's sandbox should be gone shortly after Ctrl-C
    ```
 
-2. **No server-side TTL (by design)** — sandboxes are NOT created with a fixed
-   wall-clock/idle auto-terminate, because the final test runs unbounded (`self.timeout`
-   is `None`) and a fixed TTL could kill a legitimate long run. So for **hard** kills
-   (SIGKILL / OOM / host crash) that skip `atexit`, cleanup relies on the reaper (below).
-   If you want a hard cap, add `timeout=` in `ModalExecutor._sb_create` (`Sandbox.create`
-   accepts `timeout=` — confirmed offline against modal 1.5.0) and accept that it bounds the
-   final test too.
+2. **Server-side max-lifetime IS set** — `Sandbox.create`'s default `timeout` is 300s (a
+   5-min cap, NOT unbounded), so `ModalExecutor._sb_create` passes an explicit lifetime:
+   `self.timeout + 1800s` for a bounded eval, or a 24h cap for the unbounded final test
+   (override via the `modal_sandbox_max_lifetime_seconds` config). This both prevents a long
+   eval from being killed at 5 min AND auto-terminates a sandbox leaked by a **hard** kill
+   (SIGKILL / OOM / host crash) that skips `atexit`. The reaper (below) cleans up sooner and
+   handles a sandbox whose create-time tag is unreadable. (The 24h cap value and the exact
+   mid-exec termination surface are not yet live-verified — lower the config if Modal rejects it.)
 
 3. **Tagged reaper** — every sandbox is tagged at creation with the static tag
    `{"fml_bench": "fml-bench-eval", "task": "<task>"}` (NOT a per-run id). The `reap`
@@ -380,9 +384,36 @@ There are three layers (design §5 + §12.3):
    modal app list                                                           # cross-check
    ```
 
-> Until the `# VERIFY` SDK points in §3 step 10 (`Sandbox.set_tags` / `Sandbox.list(tags=)` /
-> `created_at`) are confirmed on a live account, **assume hard-kill cleanup is manual** and
-> run `reap` (and check `modal app list`) after an abnormal exit.
+> `Sandbox.set_tags` / `Sandbox.list(tags=)` are live-confirmed (the smoke's 0-orphan check
+> used them). modal 1.5's `Sandbox` has **no `created_at` attribute**, so `_sb_create` stamps a
+> `created_at` epoch into the tags and `reap` reads age back via `get_tags()`. That age-based
+> reap path is not yet live-exercised, so after an abnormal exit still **run `reap` and check
+> `modal app list`** to confirm nothing leaked.
+
+---
+
+## 7a. Mid-eval connection drops — automatic reconnect & recovery
+
+A **transient** Modal connection error *during* an eval (e.g. "Could not connect to the Modal
+server") does NOT waste the run: `ModalExecutor` catches it, reconnects to the still-running
+sandbox by id via `Sandbox.from_id`, and **polls for the eval's exit-code sentinel** (written by
+the remote command as its last action) — recovering the eval's real result **without re-running
+it**. In the log:
+
+```
+Connection lost during val_command; reconnecting and polling for the result (no re-run): ...
+Reconnected; eval finished (rc=0) — recovered without re-running.
+```
+
+- **Scope:** only the narrow transient `ConnectionError` triggers this (auth / not-found / a
+  nonzero eval exit are NOT retried — they fail fast). Idempotent control ops (sandbox create,
+  manifest read, result pull) are separately retried with exponential backoff for up to
+  `modal_retry_budget_seconds` (default 1800s).
+- **Poll deadline:** `self.timeout` seconds measured from reconnect (the per-eval wall-clock),
+  or a 7200s cap when `self.timeout is None` (the unbounded final test).
+- **Fidelity:** the recovered returncode is the eval's TRUE exit code (read from the rc
+  sentinel), so a nonzero-exit eval is reported as a failure exactly like the no-drop path —
+  not a false success from mere result-file presence.
 
 ---
 
@@ -400,6 +431,14 @@ download (`curl …/kaggle.com/api/v1/datasets/download/…`), and
 **Kaggle + gdown secrets** attached, **or** the embeddings/model must be **pre-baked onto a
 Volume** and the build's download branch skipped. It is *not* covered by the "just call the
 setup fn on a CPU builder" recipe.
+
+> **R2 caveat (audit M-1):** `setup_data_efficiency_easyfsl` does NOT `git_commit_data` the
+> generated embeddings/model (they are `.gitignore`d), so they sit OUTSIDE the working-tree
+> hash and are NOT pushed per-eval — unlike every other task, whose data is committed. The
+> tree-hash assertion therefore does NOT verify easyfsl's baked embeddings. Before trusting
+> easyfsl R2: either `git_commit_data` the embeddings+model into the baked tree, push them
+> per-eval, or record+assert a content hash of those dirs in the manifest; at minimum validate
+> one easyfsl eval live (the build-time GPU forward pass is not bit-guaranteed across GPUs).
 
 ### privacy_meter (`Privacy_privacymeter`) — clone BEFORE env
 Its env step is `pip install -r {WORKSPACE/Privacy_privacymeter/ml_privacy_meter/requirements.txt}`

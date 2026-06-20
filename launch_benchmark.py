@@ -188,6 +188,17 @@ async def run_task(name, task_config, args, log_dir, semaphore, status):
                 start_new_session=True,
             )
             _RUNNING[name] = proc
+            # Close the TOCTOU window: if shutdown began between the pre-spawn check
+            # and this registration, the broadcast may have iterated _RUNNING without
+            # this proc — so forward the shutdown signal to it now. (L-h)
+            if _SHUTTING_DOWN and proc.returncode is None:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGINT)
+                except (ProcessLookupError, PermissionError, OSError):
+                    try:
+                        proc.terminate()
+                    except ProcessLookupError:
+                        pass
             try:
                 returncode = await proc.wait()
             finally:
@@ -294,8 +305,10 @@ Examples:
     p.add_argument("--save-code-backup", action="store_true", default=False,
                    help="Forward --save-code-backup to each child run.")
     p.add_argument("--max-concurrency", type=int, default=16,
-                   help="Max concurrent local child subprocesses (default: 16). "
-                        "Modal schedules the GPU sandboxes concurrently.")
+                   help="Max concurrent local child subprocesses (default: 16). Each child "
+                        "owns one Modal sandbox, so this also bounds PEAK concurrent (GPU) "
+                        "sandboxes — keep it <= your Modal account's concurrent-sandbox/GPU "
+                        "quota or sandbox creates fail (each failure degrades to a per-task error).")
     p.add_argument("--continue-on-failure", action="store_true", default=False,
                    help="Keep launching remaining tasks if one fails "
                         "(the default: a failed task never aborts the others, "

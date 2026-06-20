@@ -56,6 +56,15 @@ class ModalExecutor(BenchmarkExecutor):
     _RETRY_BACKOFF_CAP = 60.0        # max backoff between retries (s)
     _RECONNECT_POLL_INTERVAL = 10.0  # (b1) gap between result-file polls (s)
     _RECONNECT_POLL_MAX_S = 7200.0   # (b1) poll cap when self.timeout is None
+    # (b1/M2) the remote wrapper writes the eval's TRUE exit code here as its LAST
+    # action, so a mid-eval reconnect recovers the real returncode (not just "a
+    # result file exists"). In results_tmp/ (scratch; never pulled/parsed).
+    _EXEC_RC_SENTINEL = "results_tmp/.fmlbench_exec_rc"
+    # Sandbox MAX-LIFETIME (modal's Sandbox.create default is 300s = a 5-min cap, NOT
+    # unbounded). We pass an explicit lifetime >= the eval budget so a long eval is
+    # never killed mid-run (R2), and it doubles as a server-side orphan TTL backstop.
+    _SANDBOX_LIFETIME_HEADROOM = 1800.0  # bounded eval: exec budget + this (s)
+    _SANDBOX_MAX_LIFETIME = 86400.0      # unbounded final test cap (24h; config-overridable)
 
     def __init__(self, config: dict, *args, **kwargs):
         super().__init__(config, *args, **kwargs)
@@ -182,9 +191,14 @@ class ModalExecutor(BenchmarkExecutor):
             #    agent edits to target files because the push happens before run).
             self._push_inputs()
 
-            # 6. Remote: clean results_tmp so we never pull stale output.
-            self._sb_exec(f"rm -rf {self._shq(self._remote_repo_dir + '/results_tmp')}",
-                          use_conda=False)
+            # 6. Remote: clean results_tmp so we never pull stale output. Idempotent ->
+            #    retry transient connection errors (parity with the other control ops).
+            self._with_modal_retry(
+                "clean-results",
+                lambda: self._sb_exec(
+                    f"rm -rf {self._shq(self._remote_repo_dir + '/results_tmp')}",
+                    use_conda=False),
+            )
 
             # 7. Run the main command (with remote .git protection mirroring
             #    _protect_git_dir). Fresh-container search evals don't need it,
@@ -278,8 +292,17 @@ class ModalExecutor(BenchmarkExecutor):
         unprotect = f"chmod 0755 {git} 2>/dev/null || true"
         # The actual eval command runs under the pinned exec contract in
         # _sb_exec; the git chmod guards run in the same shell invocation so a
-        # failed command still restores writability.
-        wrapped = f"{protect}; ( {command} ); __rc=$?; {unprotect}; exit $__rc"
+        # failed command still restores writability. As the LAST action, record the
+        # TRUE exit code into the _EXEC_RC_SENTINEL file so a mid-eval reconnect
+        # (_reconnect_and_poll) recovers the real returncode instead of inferring
+        # success from result-file presence. The sentinel lives in results_tmp/
+        # (scratch; never pulled/parsed) and is written AFTER the command, so it
+        # cannot perturb the eval or its result. (M2)
+        rc_dir = self._shq(self._remote_repo_dir + "/results_tmp")
+        rc_file = self._shq(self._remote_repo_dir + "/" + self._EXEC_RC_SENTINEL)
+        wrapped = (f"{protect}; ( {command} ); __rc=$?; {unprotect}; "
+                   f"mkdir -p {rc_dir} 2>/dev/null; "
+                   f"printf '%s' \"$__rc\" > {rc_file} 2>/dev/null; exit $__rc")
         return self._sb_exec(wrapped, use_conda=True)
 
     def _sb_exec(self, command: str, use_conda: bool = True) -> SubprocessResult:
@@ -292,12 +315,15 @@ class ModalExecutor(BenchmarkExecutor):
 
         Timeout: the wall-clock limit is enforced SERVER-SIDE by passing
         ``timeout=self.timeout`` to ``Sandbox.exec`` (see _sb_spawn). modal 1.5's
-        ContainerProcess has NO per-process kill primitive, so a client-side
-        timer cannot stop a running remote eval; instead modal kills the process
-        on expiry and raises ``ExecTimeoutError`` from .wait()/.read(). We catch
-        it and return the byte-identical SubprocessResult(1, stderr=f"Timeout
-        after {self.timeout} seconds"). self.timeout None => the exec is UNBOUNDED
-        (mirrors local communicate(timeout=None) for the final test).
+        ContainerProcess has NO per-process kill primitive, so a client-side timer
+        cannot stop a running remote eval. On expiry modal 1.5's
+        ContainerProcess.wait() SWALLOWS the ExecTimeoutError and returns
+        ``returncode == -1`` (it does NOT raise — see its source); .read() MAY still
+        raise ExecTimeoutError in some cases. So we map BOTH a rc==-1 (when a
+        wall-clock is set, below) AND a raised ExecTimeoutError (the except) to the
+        parent's byte-identical SubprocessResult(1, stderr=f"Timeout after
+        {self.timeout} seconds"). self.timeout None => the exec is UNBOUNDED (mirrors
+        local communicate(timeout=None) for the final test; no deadline => no rc==-1).
         """
         if use_conda:
             argv = ["conda", "run", "--no-capture-output", "-n", self.conda_env,
@@ -340,6 +366,17 @@ class ModalExecutor(BenchmarkExecutor):
             return SubprocessResult(1, stderr=str(e))
         finally:
             self._current_proc = None
+
+        # modal 1.5's ContainerProcess.wait() catches the server-side ExecTimeoutError
+        # internally, sets returncode = -1, and returns (does NOT raise — so the
+        # `except exec_timeout` above only fires on the rarer .read() path). When a
+        # wall-clock is set, map that -1 sentinel to the parent's byte-identical
+        # timeout result. A normal process never yields -1 (exit codes are 0-255;
+        # signals are 128+sig); with self.timeout None no deadline is set so -1 cannot
+        # occur. (M1)
+        if returncode == -1 and isinstance(self.timeout, (int, float)) and self.timeout > 0:
+            print(f"Command timed out after {self.timeout} seconds")
+            return SubprocessResult(1, stderr=f"Timeout after {self.timeout} seconds")
 
         return SubprocessResult(returncode, stdout=stdout, stderr=stderr)
 
@@ -416,20 +453,23 @@ class ModalExecutor(BenchmarkExecutor):
 
     def _reconnect_and_poll(self, output_path: str) -> SubprocessResult:
         """(b1) After a transient drop DURING the eval, reconnect to the running
-        sandbox and poll for the result file — no re-run.
+        sandbox and recover the eval's TRUE exit code — no re-run.
 
-        The remote command keeps running; once it writes results_tmp/<phase>.json
-        we recover (rc 0). Polls for up to ``self.timeout`` seconds MEASURED FROM
-        RECONNECT (a 7200s cap when self.timeout is None — note the final test
-        passes no server-side exec timeout, so this cap is the poll's own ceiling),
-        tolerating further transient errors within that window. Always finite;
-        returns a failure result if the file never appears or there is no sandbox
-        id to reconnect to.
+        The remote command keeps running and, as its LAST action, writes its exit
+        code to the _EXEC_RC_SENTINEL file (see _run_command). We reconnect by id and
+        poll for that sentinel; its presence means the eval finished and its content
+        IS the real returncode, which we return verbatim — so a nonzero-exit eval is
+        reported as a failure exactly like the normal path, NOT a false success from
+        mere result-file presence (M2). Polls for up to ``self.timeout`` seconds
+        MEASURED FROM RECONNECT (a 7200s cap when self.timeout is None — the final
+        test passes no server-side exec timeout, so this cap is the poll's ceiling),
+        tolerating further transient errors. Always finite; returns a failure result
+        if the sentinel never appears or there is no sandbox id to reconnect to.
         """
         if not self._sandbox_id:
             return SubprocessResult(
                 1, stderr="Connection lost during eval and no sandbox id to reconnect to")
-        remote_fp = f"{self._remote_repo_dir}/{output_path}"
+        rc_file = f"{self._remote_repo_dir}/{self._EXEC_RC_SENTINEL}"
         budget = (self.timeout if isinstance(self.timeout, (int, float)) and self.timeout > 0
                   else self._RECONNECT_POLL_MAX_S)
         deadline = time.monotonic() + budget
@@ -437,11 +477,25 @@ class ModalExecutor(BenchmarkExecutor):
         while time.monotonic() < deadline:
             try:
                 self._sb = self._reconnect_sandbox()
-                proc = self._sb.exec("bash", "-c", f"test -e {self._shq(remote_fp)}")  # VERIFY
+                # The sentinel exists iff the command finished; its content is the rc.
+                proc = self._sb.exec("bash", "-c", f"cat {self._shq(rc_file)} 2>/dev/null")  # VERIFY
                 proc.wait()
                 if getattr(proc, "returncode", 1) == 0:
-                    print("Reconnected; result file present — recovered without re-running.")
-                    return SubprocessResult(0)
+                    raw = (proc.stdout.read() if hasattr(proc, "stdout") else "") or ""
+                    rc_str = raw.strip()
+                    if rc_str:
+                        try:
+                            rc = int(rc_str)          # robust: '--5'/garbage -> ValueError
+                        except ValueError:
+                            rc = 1                    # malformed sentinel -> treat as failure
+                        print(f"Reconnected; eval finished (rc={rc}) — recovered "
+                              "without re-running.")
+                        # Streams are genuinely lost with the dropped connection; note that
+                        # in stderr so a recovered nonzero-exit bug record isn't blank. (L-e)
+                        stderr = ("" if rc == 0 else
+                                  "(eval failed; stdout/stderr lost to a mid-eval connection "
+                                  "drop — exit code recovered via the rc sentinel)")
+                        return SubprocessResult(rc, stderr=stderr)
             except transient as e:
                 print(f"Reconnect/poll transient error, will keep trying: {e}")
             time.sleep(self._RECONNECT_POLL_INTERVAL)
@@ -625,7 +679,8 @@ class ModalExecutor(BenchmarkExecutor):
     # ==================================================================
     # Thin Modal SDK adapter — the ONLY place that touches the Modal SDK.
     # Each call is marked # VERIFY; the App.lookup -> Sandbox.create -> exec ->
-    # wait -> set_tags -> terminate path was live-confirmed on modal 1.5.0.
+    # wait -> filesystem.{write,read}_* -> set_tags -> terminate path was
+    # live-confirmed on modal 1.5.0 (filesystem replaces the deprecated open()).
     # ==================================================================
 
     def _running_app(self):
@@ -650,18 +705,26 @@ class ModalExecutor(BenchmarkExecutor):
         image = task_image(self.task)
         gpu = task_gpu(self.task)
         volumes = task_volumes(self.task)
-        # Backstops against a leaked GPU sandbox: graceful SIGINT -> atexit /
-        # _run_phase finally (terminates the sandbox); the per-eval wall-clock is
-        # enforced server-side via Sandbox.exec(timeout=) (see _sb_spawn), which
-        # bounds each command. For HARD kills (SIGKILL/OOM/host crash) that skip
-        # atexit, the backstop is the manual `reap` command (provision.py::reap).
-        # NOTE: no sandbox-level `timeout=` is passed here on purpose — the final
-        # test runs unbounded (self.timeout is None), so a fixed sandbox TTL could
-        # kill a legit long run. An operator who wants a hard server-side cap can
-        # add `timeout=` below (see docs/MODAL.md). # VERIFY
+        # Sandbox MAX-LIFETIME (timeout=): modal's Sandbox.create default is 300s — a
+        # 5-MINUTE CAP, NOT unbounded — which would kill any eval running >5 min
+        # mid-run and break R2 (the local eval has no such cap). So pass an explicit
+        # lifetime >= the eval budget: a bounded eval gets self.timeout + headroom (the
+        # exec itself is still bounded server-side at self.timeout via
+        # Sandbox.exec(timeout=) in _sb_spawn, so the sandbox only needs to outlive it);
+        # the unbounded final test (self.timeout is None) gets a generous finite cap.
+        # This ALSO acts as a server-side orphan TTL backstop for HARD kills
+        # (SIGKILL/OOM/host crash) that skip the atexit/_run_phase-finally teardown —
+        # complementing the manual `reap` (provision.py::reap). # VERIFY (timeout= = max
+        # sandbox lifetime; default 300 is too low — pinned by the L3 contract test).
+        if isinstance(self.timeout, (int, float)) and self.timeout > 0:
+            sb_timeout = int(self.timeout + self._SANDBOX_LIFETIME_HEADROOM)
+        else:
+            sb_timeout = int(self.config.get("modal_sandbox_max_lifetime_seconds",
+                                             self._SANDBOX_MAX_LIFETIME))
         create_kwargs = dict(
             app=app, image=image, volumes=volumes,
             workdir=self._remote_repo_dir,
+            timeout=sb_timeout,
         )
         # CPU-only tasks (task_gpu returns None) are created WITHOUT a gpu= request
         # so no GPU is billed for an eval that never uses one.
@@ -673,7 +736,11 @@ class ModalExecutor(BenchmarkExecutor):
         # if the tagging API differs, degrade gracefully (eval still runs; the
         # reaper just can't see this sandbox by tag).
         try:
-            sb.set_tags({**SANDBOX_TAG, "task": self.task})  # VERIFY (Sandbox.set_tags)
+            # Stamp a creation epoch into the tags: modal 1.5's Sandbox exposes no
+            # created_at attribute, so the reaper (provision.py) reads age from this
+            # tag via get_tags() instead. (H1)
+            sb.set_tags({**SANDBOX_TAG, "task": self.task,
+                         "created_at": str(int(time.time()))})  # VERIFY (Sandbox.set_tags)
         except Exception as e:  # noqa: BLE001
             print(f"Warning: could not tag sandbox (reaper filter degraded): {e}")
         return sb
@@ -703,17 +770,22 @@ class ModalExecutor(BenchmarkExecutor):
         return returncode, stdout, stderr
 
     def _sb_write(self, remote_path: str, data: bytes):
-        """Write *data* to *remote_path* inside the sandbox (mkdir -p parents)."""
+        """Write *data* to *remote_path* inside the sandbox (mkdir -p parents).
+
+        Uses the Sandbox.filesystem API; Sandbox.open/FileIO was deprecated
+        2026-03-09. NOTE modal's write_bytes signature is (data, remote_path) —
+        data FIRST (verified by the L3 contract test's arg-order pin).
+        """
+        fs = self._sb.filesystem  # VERIFY (Sandbox.filesystem property; modal 1.5.0)
         parent = remote_path.rsplit("/", 1)[0]
-        self._sb.exec("bash", "-c", f"mkdir -p {self._shq(parent)}").wait()  # VERIFY
-        with self._sb.open(remote_path, "wb") as f:  # VERIFY (Sandbox.open)
-            f.write(data)
+        if parent:
+            fs.make_directory(parent, create_parents=True)  # VERIFY
+        fs.write_bytes(data, remote_path)  # VERIFY (data, remote_path)
 
     def _sb_read(self, remote_path: str) -> str:
         """Read *remote_path* from the sandbox as text (empty string if absent)."""
         try:
-            with self._sb.open(remote_path, "r") as f:  # VERIFY
-                return f.read()
+            return self._sb.filesystem.read_text(remote_path)  # VERIFY (Sandbox.filesystem)
         except self._transient_modal_errors():
             raise  # transient infra -> let _with_modal_retry handle it
         except Exception:  # noqa: BLE001
@@ -721,8 +793,7 @@ class ModalExecutor(BenchmarkExecutor):
 
     def _sb_read_bytes(self, remote_path: str) -> bytes:
         """Read *remote_path* from the sandbox as bytes."""
-        with self._sb.open(remote_path, "rb") as f:  # VERIFY
-            return f.read()
+        return self._sb.filesystem.read_bytes(remote_path)  # VERIFY (Sandbox.filesystem)
 
     def _sb_terminate(self, sb):
         """Terminate the sandbox."""
@@ -750,6 +821,8 @@ class ModalExecutor(BenchmarkExecutor):
             "CUDA_VISIBLE_DEVICES",
             "LD_LIBRARY_PATH", "LD_PRELOAD",
             "PATH",  # overlaid below with the image's conda PATH
+            "HOME",  # local home (/home/<user>) doesn't exist on the sandbox; reset
+                     # to /root below. HF_HOME/etc. are separate and NOT stripped. (L1)
             "CONDA_PREFIX", "CONDA_DEFAULT_ENV", "CONDA_SHLVL", "CONDA_EXE",
             "CONDA_PYTHON_EXE", "_CE_CONDA", "_CE_M",
             "VIRTUAL_ENV", "PYTHONPATH", "PYTHONHOME",

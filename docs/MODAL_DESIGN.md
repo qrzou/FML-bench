@@ -67,8 +67,10 @@ architecturally sound; v2.1 corrects these (none affect R1):
 7. **Graceful SIGINT must not leak the sandbox.** Because `kill_running_process` is decoupled
    from sandbox teardown, `ModalExecutor` itself owns teardown via a `_run_phase` try/finally
    **and an `atexit` hook** (the shared signal handler calls `sys.exit`, which runs `atexit`)
-   — no change to the shared handler (R1-safe). A tagged-sandbox reaper (`provision.py::reap`)
-   is the backstop for hard kills; no server-side TTL is set (the final test is unbounded).
+   — no change to the shared handler (R1-safe). `_sb_create` sets an explicit sandbox
+   max-lifetime (`self.timeout + 1800s`, or a 24h cap for the unbounded final test) that
+   auto-terminates a leaked sandbox server-side; the tagged-sandbox reaper (`provision.py::reap`)
+   is the earlier hard-kill backstop.
 8. **Soften universal wording** ("byte-identical", "exact HEAD", "pilot confirms hermeticity")
    to the scoped, code-grounded claims below.
 
@@ -82,9 +84,9 @@ architecturally sound; v2.1 corrects these (none affect R1):
 | 4 | Ephemeral sandbox **git-resets every step** | **No per-step reset**: each ephemeral sandbox starts from the exact baked baseline. Search-loop evals are hermetic *by code* (every `val` trains from scratch); this is gated by the byte-diff. Persistent-working-dir fallback for any non-hermetic task | Local `_reset_git` runs **once** in `setup_workspace`, never per `run_val`; v2.1 states this diverges deliberately and is sound only for hermetic evals |
 | 5 | `timeout`+pgkill, `None` case unspecified | **`self.timeout is None` ⇒ unbounded remote exec** (final test); a positive timeout is enforced via `Sandbox.exec(timeout=)` + `ExecTimeoutError` (**Option B** — modal 1.5 has no per-process kill) | base.py sets `executor.timeout = None` for the final test |
 | 6 | Remote exec contract left to a `# VERIFY` comment | **Pinned exec contract**: byte-identical argv `conda run --no-capture-output -n <env> bash -c <command>`, `cwd`=remote repo_dir, scrubbed env (no Modal-injected `CUDA_VISIBLE_DEVICES`/login-shell/extra CUDA paths) | Otherwise device selection / nondeterministic kernels can diverge |
-| 7 | `kill_running_process` semantics | **modal 1.5 has no per-process kill, so `kill_running_process` terminates the sandbox** (which stops the eval), no-op when idle; teardown also lives in `_run_phase` finally + an `atexit` hook + `cleanup` (**Option B**) | Also called on the happy-path `finally` (run_agent_benchmark.py:341), where it is a benign idempotent no-op when idle; teardown must not depend on it |
+| 7 | `kill_running_process` semantics | **modal 1.5 has no per-process kill, so `kill_running_process` terminates the sandbox** (which stops the eval), no-op when idle; teardown also lives in `_run_phase` finally + an `atexit` hook + `cleanup` (**Option B**) | Also called on the happy-path `finally` in `run_agent_benchmark.py`, where it is a benign idempotent no-op when idle; teardown must not depend on it |
 | 8 | `setup.py` "additive export" (vague) | **Implemented differently — see header note:** the build calls the REAL `setup.CONDA_ENVS[env]()` at image-build time, so **`setup.py` is unchanged** (no `CONDA_ENV_SPECS` table). **privacy_meter** is special-cased by call ordering (clone→env→data) | Reuses the real conda-env commands verbatim; `setup.py` stays byte-identical (better for R1) |
-| 9 | "reuse setup fns **and** checkout config.json pinned_commit" (contradictory) | **Reuse the setup fns** (they own the commit); the provisioner **records the built tree-hash**; `ModalExecutor` asserts the remote tree-hash matches it | setup fns hardcode their commit and never read config.json; `pinned_commit` is only presence-checked in `runner.py:121` |
+| 9 | "reuse setup fns **and** checkout config.json pinned_commit" (contradictory) | **Reuse the setup fns** (they own the commit); the provisioner **records the built tree-hash**; `ModalExecutor` asserts the remote tree-hash matches it | setup fns hardcode their commit and never read config.json; `pinned_commit` is only presence-checked in `runner.py`'s new-format required-keys list |
 | 10 | "result-dir writing byte-identical" | Scope that claim to the **metric-bearing `*_info.json`**; `--save-code-backup` is warned/no-op'd in Modal mode | `_backup_files` would otherwise capture only the local target-file diff (scoring never reads `code_backup/`) |
 
 ## 2. Architecture
@@ -196,11 +198,11 @@ repo/datasets; never pull checkpoints.
   idempotent + **no-op when idle**. (Revised from "kill only the process group" — Option B.)
 - `cleanup()` — terminate any lingering sandbox, then `super().cleanup()` (local git reset).
 - **SIGINT/teardown safety (R1-safe):** the shared signal handler
-  (run_agent_benchmark.py:323-331) calls `sys.exit(1)`, which runs `atexit`; the
+  (`run_agent_benchmark.py`'s `_cleanup_on_signal`) calls `sys.exit(1)`, which runs `atexit`; the
   `ModalExecutor` `atexit` hook + the `_run_phase` finally terminate the sandbox. No change
   to the shared handler. Hard kills (SIGKILL/OOM/crash) that skip `atexit` are caught by the
-  tagged-sandbox reaper (`provision.py::reap`); no server-side TTL is set (the final test is
-  unbounded) — §12.3.
+  explicit sandbox max-lifetime `_sb_create` sets (`self.timeout + 1800s`, or a 24h cap for the
+  unbounded final test) and, sooner, by the tagged-sandbox reaper (`provision.py::reap`) — §12.3.
 - `.git` protection — during the shared `pre_test_val`→`final_test` sandbox, wrap the main
   command in remote `chmod 0555/0755 <repo>/.git` (try/finally) to mirror `_protect_git_dir`
   (for fresh-container search evals it is unnecessary).
@@ -321,7 +323,7 @@ python launch_benchmark.py \
   the pilot byte-diff**, with the **stateful checkpoint-handoff gate (opacus)** and the
   persistent-working-dir fallback for any task that fails.
 - **R3:** claims re-grounded against `setup.py` (`TASKS`, `clone_repo`, `git_commit_data`,
-  `CONDA_ENVS`, the easyfsl/privacy_meter/gcastle specifics, `runner.py:121`); the v1
+  `CONDA_ENVS`, the easyfsl/privacy_meter/gcastle specifics, `runner.py`'s required-keys list); the v1
   aider/seeds/`skip_conda`/bare-commit and the v2 CPU-pilot/byte-identical/exact-HEAD
   overstatements are removed.
 
@@ -348,9 +350,10 @@ python launch_benchmark.py \
 2. **`timeout=None` mapping:** confirm the chosen Modal exec API treats `None` as unbounded
    (not "kill immediately") on a long-running task.
 3. **Sandbox leak:** graceful SIGINT is handled by the `ModalExecutor` `atexit`/finally
-   teardown (§5, R1-safe). Hard kills (SIGKILL/OOM/host-crash) skip `atexit` → the
-   tagged-sandbox reaper (`provision.py::reap`) is the backstop; no server-side TTL is set
-   (the final test is unbounded).
+   teardown (§5, R1-safe). Hard kills (SIGKILL/OOM/host-crash) skip `atexit` → the explicit
+   sandbox max-lifetime `_sb_create` sets (`self.timeout + 1800s`, or a 24h cap for the
+   unbounded final test) auto-terminates it server-side; the tagged-sandbox reaper
+   (`provision.py::reap`) is the earlier backstop.
 4. **Hermeticity / checkpoint handoff:** search-loop hermeticity holds by code; the
    shared-sandbox checkpoint handoff is validated by the **opacus** stateful gate before
    generalization; non-hermetic tasks fall back to the persistent working-dir Volume.

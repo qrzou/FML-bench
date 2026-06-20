@@ -17,15 +17,18 @@ project rebuilds nothing.
 ModalExecutor's atexit/finally teardown, but hard kills (SIGKILL/OOM/host
 crash) skip atexit and can leak a running sandbox; this command terminates
 stale sandboxes tagged by this app (it is DRY-RUN by default — pass --force to
-actually terminate). No server-side TTL is set on sandboxes (the unbounded
-final test would be at risk), so `reap` is the hard-kill backstop; an operator
-who wants a server-side cap can add `timeout=` in ModalExecutor._sb_create.
+actually terminate). ModalExecutor._sb_create sets an explicit sandbox max-lifetime
+(the eval budget + headroom, or a 24h cap for the unbounded final test) that auto-
+terminates a leaked sandbox server-side; `reap` cleans up BEFORE that lifetime
+elapses (and any sandbox whose create-time tag is unreadable).
 
 This module imports the Modal SDK at top level (fine for py_compile and for the
 Modal CLI host where modal is installed). It is never imported on the local
 eval path.
 """
 from __future__ import annotations
+
+import time
 
 import modal  # VERIFY (Modal SDK; absent locally, present on the Modal CLI host)
 
@@ -71,6 +74,12 @@ def build(task: str):
     print(f"[provision] building image for task={task} gpu={task_gpu(task)} "
           f"volumes={list(task_volumes(task))} ...")
     sb = modal.Sandbox.create(app=app, image=img)  # VERIFY (forces image build)
+    # Tag it like an eval sandbox so `reap` can also reclaim a build sandbox if this
+    # try/finally teardown is ever skipped (e.g. the host dies mid-build). (L-b)
+    try:
+        sb.set_tags({**SANDBOX_TAG, "task": task, "created_at": str(int(time.time()))})  # VERIFY
+    except Exception as e:  # noqa: BLE001
+        print(f"[provision] warning: could not tag build sandbox: {e}")
     try:
         p = sb.exec("bash", "-c",
                     f"cat {REMOTE_ROOT}/{MANIFEST_DIR}/{task}.json")  # VERIFY
@@ -104,14 +113,20 @@ def _sb_has_app_tag(sb) -> bool:
 
 
 def _sb_age_seconds(sb):
-    """Seconds since *sb* was created, or None if the accessor is unknown. # VERIFY."""
-    import datetime as _dt
+    """Seconds since *sb* was created, or None if unknown.
+
+    modal 1.5's Sandbox exposes NO ``created_at`` attribute, so
+    ModalExecutor._sb_create stamps a creation epoch into the sandbox tags; we read
+    it back via ``get_tags()`` (a public, verified accessor). Returns None (->
+    fail-closed in reap) when the tag is missing or unparseable. # VERIFY (get_tags)
+    """
     import time
     try:
-        created = sb.created_at  # VERIFY (created-at accessor: datetime or epoch seconds)
-        if isinstance(created, _dt.datetime):
-            return (_dt.datetime.now(created.tzinfo) - created).total_seconds()
-        return time.time() - float(created)
+        tags = sb.get_tags()  # VERIFY (Sandbox.get_tags)
+        created = tags.get("created_at")
+        if created is None:
+            return None
+        return max(0.0, time.time() - float(created))
     except Exception:  # noqa: BLE001
         return None
 
