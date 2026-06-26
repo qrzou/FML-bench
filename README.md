@@ -236,8 +236,8 @@ for the full 18-task suite.
 | Robustness (ART)                         | `configs/tasks/robustness_and_reliability_art.yaml` |
 
 Run an agent on these task configs and [score](#score-a-run) it exactly as you
-would the full suite. **Continual Learning (continual-learning)** and **Unlearning
-(open-unlearning)** tasks are not suitable as subset tasks due to high variance and large metric scale.
+would the full suite. Continual Learning (continual-learning) and Unlearning
+(open-unlearning) tasks are not suitable as subset tasks due to high variance and large metric scale.
 On this subset the overall ranking of agents closely tracks
 what the full 18-task benchmark shows, making Lite a useful, cheaper proxy when a
 full sweep is out of reach.
